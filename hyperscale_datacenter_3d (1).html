@@ -1,0 +1,3193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HYPERION-1 // 3D Interactive AI Data Center & Silicon Anatomy Museum</title>
+  <meta name="description" content="Explore a hyperscale AI data center in 3D from the 250MW substation and CDU cooling loop down to opening racks, pulling out TPU v6e and NVIDIA GB200 trays, and inspecting silicon dies, HBM3e stacks, and copper cold plates." />
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; user-select: none; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #06080c;
+      color: #f0f6fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    }
+    .font-mono-tech {
+      font-family: "JetBrains Mono", "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    #glCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+    #glCanvas:active {
+      cursor: grabbing;
+    }
+    /* Responsive Smartphone / Tablet Layout */
+    @media (max-width: 768px) {
+      #placardPanel {
+        top: auto !important;
+        bottom: 54px !important;
+        left: 8px !important;
+        right: 8px !important;
+        width: auto !important;
+        max-width: none !important;
+      }
+      #placardBody {
+        max-height: 34vh !important;
+      }
+      header.fixed {
+        top: 6px !important;
+        left: 6px !important;
+        right: 6px !important;
+      }
+      footer.fixed {
+        bottom: 6px !important;
+        left: 6px !important;
+        right: 6px !important;
+      }
+      #desktopControlsHint {
+        display: none !important;
+      }
+    }
+    .glass-bar {
+      background: rgba(10, 14, 22, 0.82);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    }
+    .nav-step {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #9ca3af;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+    }
+    .nav-step:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .nav-step.active {
+      background: rgba(14, 165, 233, 0.22);
+      border-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+    }
+    .trace-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+      transition: all 0.16s ease;
+      cursor: pointer;
+    }
+    .trace-pill:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+    }
+    .trace-pill.active-all {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: #e2e8f0;
+      color: #ffffff;
+    }
+    .trace-pill.active-cooling {
+      background: rgba(6, 182, 212, 0.25);
+      border-color: #22d3ee;
+      color: #ecfeff;
+      box-shadow: 0 0 14px rgba(34, 211, 238, 0.3);
+    }
+    .trace-pill.active-power {
+      background: rgba(245, 158, 11, 0.25);
+      border-color: #fbbf24;
+      color: #fffbeb;
+      box-shadow: 0 0 14px rgba(251, 191, 36, 0.3);
+    }
+    .trace-pill.active-optical {
+      background: rgba(56, 189, 248, 0.25);
+      border-color: #38bdf8;
+      color: #f0f9ff;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
+    }
+    .trace-pill.active-silicon {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: #34d399;
+      color: #ecfdf5;
+      box-shadow: 0 0 14px rgba(52, 211, 153, 0.3);
+    }
+    /* 3D Anchored Museum Callout Pins */
+    .pin-3d {
+      position: fixed;
+      transform: translate(-50%, -100%);
+      pointer-events: auto;
+      cursor: pointer;
+      transition: opacity 0.18s ease, transform 0.15s ease;
+      z-index: 15;
+    }
+    .pin-3d:hover {
+      transform: translate(-50%, -104%) scale(1.05);
+      z-index: 25;
+    }
+    .pin-card {
+      background: rgba(8, 12, 19, 0.88);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65);
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .pin-3d:hover .pin-card, .pin-3d.selected .pin-card {
+      border-color: #38bdf8;
+      background: rgba(14, 25, 42, 0.95);
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.35);
+    }
+    /* Interactive Glossary Highlighted Terms */
+    .glossary-term {
+      color: #7dd3fc;
+      border-bottom: 1px dashed rgba(56, 189, 248, 0.75);
+      cursor: pointer;
+      padding: 0 1px;
+      border-radius: 2px;
+      transition: all 0.14s ease;
+    }
+    .glossary-term:hover, .glossary-term.active-term {
+      background: rgba(56, 189, 248, 0.22);
+      color: #ffffff;
+      border-bottom-style: solid;
+      border-bottom-color: #38bdf8;
+    }
+    .glossary-chip {
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: #bae6fd;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+    .glossary-chip:hover, .glossary-chip.active {
+      background: rgba(56, 189, 248, 0.28);
+      border-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+    }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <!-- Single-World Full-Screen 3D WebGL2 PBR Viewport -->
+  <canvas id="glCanvas"></canvas>
+
+  <!-- Dynamic 3D Callout Pins Container (Anchored to 3D Hardware Parts) -->
+  <div id="pinsContainer" class="fixed inset-0 pointer-events-none z-10 overflow-hidden"></div>
+
+  <!-- TOP NAVIGATION BAR: 5-Level Seamless Zoom Breadcrumbs (1.2GW Campus -> Hall -> Rack -> Tray -> Silicon) -->
+  <header class="fixed top-3 left-3 right-3 z-20 pointer-events-none flex flex-wrap items-center justify-between gap-2">
+    <!-- Left: 5-Level Scale Zoom Stepper -->
+    <div class="glass-bar pointer-events-auto rounded-lg p-1.5 flex flex-wrap items-center gap-1">
+      <div class="px-2 py-1 border-r border-white/10 mr-0.5">
+        <div class="text-xs font-bold tracking-wider text-white flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+          <span>HYPERION-1 // 1.2GW CAMPUS</span>
+        </div>
+        <div id="scaleReadout" class="text-xs font-mono-tech text-slate-400">SCALE: 1.5km (1.2GW CAMPUS & GRID)</div>
+      </div>
+
+      <button id="zoomBtn0" onclick="setZoomLevel(0)" class="nav-step active px-2.5 py-1.5 rounded text-xs font-mono-tech flex items-center gap-1">
+        <span class="text-amber-400 font-bold">0</span>
+        <span>1.2GW Campus & Grid</span>
+      </button>
+      <span class="text-slate-600 text-xs">›</span>
+      <button id="zoomBtn1" onclick="setZoomLevel(1)" class="nav-step px-2.5 py-1.5 rounded text-xs font-mono-tech flex items-center gap-1">
+        <span class="text-sky-400 font-bold">1</span>
+        <span>AI Hall Interior</span>
+      </button>
+      <span class="text-slate-600 text-xs">›</span>
+      <button id="zoomBtn2" onclick="setZoomLevel(2)" class="nav-step px-2.5 py-1.5 rounded text-xs font-mono-tech flex items-center gap-1">
+        <span class="text-sky-400 font-bold">2</span>
+        <span id="btn2Label">Open Rack</span>
+      </button>
+      <span class="text-slate-600 text-xs">›</span>
+      <button id="zoomBtn3" onclick="setZoomLevel(3)" class="nav-step px-2.5 py-1.5 rounded text-xs font-mono-tech flex items-center gap-1">
+        <span class="text-sky-400 font-bold">3</span>
+        <span>Pull Tray</span>
+      </button>
+      <span class="text-slate-600 text-xs">›</span>
+      <button id="zoomBtn4" onclick="setZoomLevel(4)" class="nav-step px-2.5 py-1.5 rounded text-xs font-mono-tech flex items-center gap-1">
+        <span class="text-sky-400 font-bold">4</span>
+        <span>Silicon & HBM3e</span>
+      </button>
+    </div>
+
+    <!-- Right: Hardware Architecture Target Switcher, Roof Cutaway & Cold-Plate Explode Buttons -->
+    <div class="glass-bar pointer-events-auto rounded-lg p-1.5 flex flex-wrap items-center gap-1.5 text-xs font-mono-tech">
+      <button id="roofBtn" onclick="toggleBuildingRoof()" class="nav-step px-2.5 py-1.5 rounded text-sky-300 border-sky-400/30 font-semibold" title="Lift or Close Building 1 Roof Canopy at Campus Scale">
+        [R] Roof Cutaway: OFF
+      </button>
+      <div class="w-px h-5 bg-white/10 mx-0.5"></div>
+      <span class="text-slate-400 px-1">RACK:</span>
+      <button id="archTpuBtn" onclick="selectArchitecture('tpu')" class="nav-step active px-2.5 py-1.5 rounded font-semibold">
+        TPU v6e Pod
+      </button>
+      <button id="archGpuBtn" onclick="selectArchitecture('gpu')" class="nav-step px-2.5 py-1.5 rounded font-semibold">
+        GB200 NVL72
+      </button>
+      <div class="w-px h-5 bg-white/10 mx-0.5"></div>
+      <button id="explodeBtn" onclick="toggleExplodeColdPlate()" class="nav-step px-2.5 py-1.5 rounded text-amber-300 border-amber-400/30 font-semibold" title="Lift Copper Cold Plate to see Silicon Die & HBM3e stacks">
+        [E] Explode Chip: OFF
+      </button>
+    </div>
+  </header>
+
+  <!-- RIGHT MUSEUM PLACARD (Slim, Collapsible Educational Inspector + Interactive Plain-English Glossary) -->
+  <aside id="placardPanel" class="fixed top-20 right-3 z-20 pointer-events-auto w-88 max-w-sm glass-bar rounded-lg overflow-hidden transition-transform duration-300">
+    <!-- Placard Header -->
+    <div class="px-3.5 py-2.5 border-b border-white/10 flex items-center justify-between gap-2 bg-white/[0.02]">
+      <div class="min-w-0">
+        <div id="placardCategory" class="text-xs font-mono-tech uppercase tracking-wider text-sky-400 font-semibold truncate">
+          STATION 1 OF 10 // FACILITY OVERVIEW
+        </div>
+        <h2 id="placardTitle" class="text-sm font-bold text-white mt-0.5 truncate">
+          Hyperscale AI Hall & Interconnects
+        </h2>
+      </div>
+      <div class="flex items-center gap-1 shrink-0">
+        <button onclick="togglePlainEnglish()" id="plainEngBtn" class="nav-step active px-2 py-1 rounded text-xs font-mono-tech" title="Toggle Plain-English Analogy & Interactive Term Decoder">
+          💡 Plain-English: ON
+        </button>
+        <button onclick="togglePlacard()" id="placardToggleBtn" class="nav-step px-2 py-1 rounded text-xs font-mono-tech" title="Collapse/Expand Museum Guide">
+          Hide
+        </button>
+      </div>
+    </div>
+
+    <!-- Placard Body -->
+    <div id="placardBody" class="p-3.5 space-y-3 text-xs leading-relaxed max-h-[calc(100vh-190px)] overflow-y-auto">
+      <!-- Plain-English Everyday Analogy Banner (Shown when Plain-English Mode is ON) -->
+      <div id="plainEnglishBox" class="rounded-md p-2.5 bg-emerald-950/45 border border-emerald-400/30 text-emerald-100 space-y-1">
+        <div class="flex items-center justify-between font-mono-tech text-xs text-emerald-300 font-semibold">
+          <span>💡 PLAIN-ENGLISH ANALOGY</span>
+          <span class="text-emerald-400/80">Click any dashed term below</span>
+        </div>
+        <p id="plainEnglishText" class="text-xs text-emerald-50/95 leading-snug">
+          Think of this rack as a 100,000-watt apartment building for AI chips: a solid copper bar in the back acts like an electrified train rail for power, while blue and red water pipes circulate cold water straight onto every chip like a car radiator.
+        </p>
+      </div>
+
+      <!-- Main Engineering Description (Terms auto-linked with dashed underlines) -->
+      <p id="placardDesc" class="text-slate-200"></p>
+
+      <!-- Interactive Glossary Definition Spotlight Card (Updates when hovering/clicking any term or chip!) -->
+      <div id="glossarySpotlight" class="rounded-md p-2.5 bg-sky-950/55 border border-sky-400/45 space-y-1.5 shadow-inner">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5">
+            <span class="px-1.5 py-0.5 rounded bg-sky-400/20 text-sky-300 font-mono-tech text-xs font-bold" id="glossTermTitle">TPU v6e / Trillium</span>
+            <span class="text-xs font-mono-tech text-slate-300" id="glossTermExpansion">Tensor Processing Unit (Gen 6)</span>
+          </div>
+        </div>
+        <p id="glossTermPlain" class="text-xs text-sky-50 leading-snug">
+          Google’s 6th-generation custom AI superchip (codenamed <strong>Trillium</strong>). The "e" stands for Efficiency—built specifically for high-speed matrix math in models like Gemini.
+        </p>
+        <div class="pt-1 border-t border-sky-400/20 flex flex-wrap items-center gap-1" id="glossaryChipsBar">
+          <!-- Dynamically populated term chips for this exhibit -->
+        </div>
+      </div>
+
+      <!-- End-to-End Connection Schematic Path -->
+      <div class="bg-black/45 rounded p-2.5 border border-white/10 space-y-1.5">
+        <div class="font-mono-tech text-xs text-slate-400 uppercase tracking-wider">HOW IT CONNECTS END-TO-END:</div>
+        <div id="placardChain" class="font-mono-tech text-xs text-sky-300 space-y-1"></div>
+      </div>
+
+      <!-- Technical Specs Table -->
+      <div id="placardSpecs" class="grid grid-cols-2 gap-2 font-mono-tech text-xs"></div>
+
+      <!-- Guided Tour Stepper + Quick Action inside Placard -->
+      <div class="pt-2 border-t border-white/10 flex items-center justify-between gap-2 font-mono-tech">
+        <button onclick="stepTour(-1)" class="nav-step px-2.5 py-1.5 rounded flex-1 text-center text-xs">
+          ← Prev Exhibit
+        </button>
+        <button id="placardActionBtn" onclick="advanceZoomOrTour()" class="nav-step active px-3 py-1.5 rounded flex-1 text-center text-xs font-semibold">
+          Zoom Deeper →
+        </button>
+        <button onclick="stepTour(1)" class="nav-step px-2.5 py-1.5 rounded flex-1 text-center text-xs">
+          Next Exhibit →
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- BOTTOM BAR: Interconnected Subsystem Animated Flow Tracers + Camera Hint -->
+  <footer class="fixed bottom-3 left-3 right-3 z-20 pointer-events-none flex flex-wrap items-end justify-between gap-2">
+    <!-- Subsystem Flow Tracer Selector -->
+    <div class="glass-bar pointer-events-auto rounded-lg p-1.5 flex flex-wrap items-center gap-1.5 text-xs font-mono-tech">
+      <span class="text-slate-400 px-2">TRACE SUBSYSTEM FLOW:</span>
+      <button id="traceBtn0" onclick="setSubsystemTrace(0)" class="trace-pill active-all px-2.5 py-1.5 rounded">
+        All Systems
+      </button>
+      <button id="traceBtn1" onclick="setSubsystemTrace(1)" class="trace-pill px-2.5 py-1.5 rounded flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+        <span>❄️ Liquid Cooling Loop (Cold Plate ↔ CDU ↔ Tower)</span>
+      </button>
+      <button id="traceBtn2" onclick="setSubsystemTrace(2)" class="trace-pill px-2.5 py-1.5 rounded flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+        <span>⚡ Power Chain (13.8kV ↔ 48V Busbar ↔ 0.8V VRM)</span>
+      </button>
+      <button id="traceBtn3" onclick="setSubsystemTrace(3)" class="trace-pill px-2.5 py-1.5 rounded flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+        <span>🌐 Fiber & NVLink (OSFP ↔ MEMS OCS / Spine)</span>
+      </button>
+      <button id="traceBtn4" onclick="setSubsystemTrace(4)" class="trace-pill px-2.5 py-1.5 rounded flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span>🧠 Silicon Dataflow (HBM3e ↔ CoWoS ↔ Tensor Die)</span>
+      </button>
+    </div>
+
+    <!-- Controls & Walk/Orbit Indicator -->
+    <div class="glass-bar pointer-events-auto rounded-lg px-3 py-2 text-xs font-mono-tech text-slate-300 flex items-center gap-3">
+      <span>🖱️ Drag: Orbit 360° • Scroll: Zoom In/Out</span>
+      <span class="text-slate-600">|</span>
+      <span>⌨️ WASD: Walk/Pan • Click Any 3D Part or Pin</span>
+    </div>
+  </footer>
+
+  <script>
+    // ============================================================================
+    // HYPERION-1 // 3D INTERACTIVE HARDWARE & FACILITY MUSEUM ENGINE (WEBGL2 PBR)
+    // ============================================================================
+    const canvas = document.getElementById('glCanvas');
+    const gl = canvas.getContext('webgl2', { antialias: true, powerPreference: 'high-performance' });
+
+    if (!gl) {
+      alert('WebGL2 is required to view the 3D Interactive Hardware Museum.');
+    }
+
+    // --- Material Palette Constants (Cook-Torrance PBR Shader IDs) ---
+    const MAT_FLOOR            = 0;  // Polished Dark Anthracite Epoxy Floor with Grid & Reflections
+    const MAT_CHASSIS_DARK     = 1;  // Powder-Coated Obsidian Rack & Server Frame
+    const MAT_PERF_DOOR        = 2;  // Hexagonal Honeycomb Perforated Mesh Rack Door (Alpha Cutout)
+    const MAT_PCB_BOARD        = 3;  // 28-Layer Motherboard Soldermask with Gold Micro-Traces
+    const MAT_BGA_SUBSTRATE    = 4;  // Organic Chip Package Substrate with SMD Capacitor Ring
+    const MAT_COWOS_INTERPOSER = 5;  // Mirror Silicon Interposer (CoWoS-L / CoWoS-S)
+    const MAT_SILICON_DIE      = 6;  // Iridescent Reticle-Limit Compute Die (TPU v6e / Blackwell B200)
+    const MAT_HBM_STACK        = 7;  // 12-Hi Stacked HBM3e Memory Cube with 12 Visible DRAM Strata
+    const MAT_COPPER_COLDPLATE = 8;  // Machined C11000 Copper Cold Plate, Skived Micro-Fins & 48V Busbar
+    const MAT_COOLANT_COLD     = 9;  // Chilled 18°C Supply Manifold & Braided Hose (Animated Blue Flow)
+    const MAT_COOLANT_HOT      = 10; // Warm 42°C Return Manifold & Braided Hose (Animated Red/Amber Flow)
+    const MAT_FIBER_OPTIC      = 11; // Single-Mode Yellow/Aqua Fiber Optic Cables (Animated Laser Pulses)
+    const MAT_POWER_48V        = 12; // 13.8kV / 480V / 48V Power Busways, Transformers & VRM Stages
+    const MAT_ALUMINUM_BRUSHED = 13; // Brushed Anodized Aluminum Rails, OSFP Cages, CDU Skids & QDCs
+    const MAT_GOLD_CONTACT     = 14; // 24K Gold Blind-Mate Connectors, NVLink Spine & MEMS OCS Mirrors
+    const MAT_GLASS_CUTAWAY    = 15; // Semi-Translucent Cutaway Housing (CDU Exchanger & Cold Plate Lid)
+    const MAT_CAMPUS_TERRAIN   = 16; // Exterior 1.2GW Campus Landscape, Roadways & Illuminated Utility Corridors
+    const MAT_ARCH_CONCRETE    = 17; // Fluted Architectural Precast Concrete & Titanium Cladding with Clerestory Light Bands
+    const MAT_SOLAR_PV         = 18; // Rooftop Monocrystalline Silicon Photovoltaic Solar Arrays with Silver Busbar Grid
+
+    // --- Interactive Museum State ---
+    const state = {
+      time: 0,
+      zoomLevel: 0,         // 0: 1.2GW Campus & State Grid (1.5km), 1: AI Hall (30m), 2: Open Rack (2m), 3: Compute Tray (0.5m), 4: Silicon & HBM3e (80mm)
+      arch: 'tpu',          // 'tpu' (Google TPU v6e Superpod Rack at X=-1.35) or 'gpu' (NVIDIA GB200 NVL72 at X=+1.35)
+      traceMode: 0,         // 0: All, 1: Liquid Cooling, 2: Power Chain, 3: Fiber/NVLink, 4: Silicon/HBM
+      explodeColdPlate: false,
+      roofCutaway: false,   // Toggle Building 1 Roof Cutaway at Level 0 Campus View
+      placardVisible: true,
+      tourIndex: 0,
+
+      // Articulated Mechanical Animation States (Spring-interpolated in render loop)
+      tpuDoorAngle: 0,      // radians (0 = closed, 1.95 = swung open 112 deg)
+      gpuDoorAngle: 0,
+      tpuTraySlide: 0,      // meters (0 = inside rack, 0.72 = pulled out on rails)
+      gpuTraySlide: 0,
+      coldPlateLift: 0,     // meters (0 = clamped on die, 0.085 = levitated above die & HBM3e)
+      roofLift: 0,          // meters (0 = roof seated on Building 1, 22.0 = lifted away for Hall interior view)
+
+      // Smooth Orbit / Fly Camera with Target Interpolation (Starts at Level 0: 1.2GW Campus & State Grid Overview)
+      cam: {
+        targetX: 6.0, targetY: 2.0, targetZ: -12.0,
+        curTargetX: 6.0, curTargetY: 2.0, curTargetZ: -12.0,
+        yaw: 0.34,          // Aerial isometric angle showing 4 Data Halls, 500kV State Grid Pylons, BESS & Cooling Plant
+        pitch: 0.42,
+        dist: 76.0,
+        curYaw: 0.34,
+        curPitch: 0.42,
+        curDist: 76.0,
+        eyeX: 0, eyeY: 32, eyeZ: 65
+      },
+      keys: {},
+      dragging: false,
+      dragMoved: false,
+      lastX: 0,
+      lastY: 0,
+      selectedPinId: 'state_grid_500kv'
+    };
+
+    // Hero Rack Center Coordinates
+    const TPU_RACK_X = -1.35;
+    const GPU_RACK_X =  1.35;
+    const RACK_Z     =  0.0;
+    const HERO_TRAY_Y = 1.32; // Waist/eye-level pull-out compute tray height
+
+    // ============================================================================
+    // PROCEDURAL 3D CAD GEOMETRY BUILDER (BOXES, CYLINDERS, 3D BEZIER TUBES)
+    // ============================================================================
+    class CadMeshBuilder {
+      constructor() {
+        this.positions = [];
+        this.normals = [];
+        this.uvs = [];
+        this.metas = []; // [matId, flowOffset, partGroup, unused]
+        this.indices = [];
+      }
+
+      addVertex(x, y, z, nx, ny, nz, u, v, matId, flow = 0) {
+        const idx = this.positions.length / 3;
+        this.positions.push(x, y, z);
+        this.normals.push(nx, ny, nz);
+        this.uvs.push(u, v);
+        this.metas.push(matId, flow);
+        return idx;
+      }
+
+      // Axis-aligned or local 3D Box
+      addBox(cx, cy, cz, sx, sy, sz, matId, flow = 0) {
+        const hx = sx * 0.5, hy = sy * 0.5, hz = sz * 0.5;
+        const faces = [
+          // Front (+Z)
+          { n: [0, 0, 1],  v: [[-hx,-hy,hz], [hx,-hy,hz], [hx,hy,hz], [-hx,hy,hz]] },
+          // Back (-Z)
+          { n: [0, 0, -1], v: [[hx,-hy,-hz], [-hx,-hy,-hz], [-hx,hy,-hz], [hx,hy,-hz]] },
+          // Right (+X)
+          { n: [1, 0, 0],  v: [[hx,-hy,hz], [hx,-hy,-hz], [hx,hy,-hz], [hx,hy,hz]] },
+          // Left (-X)
+          { n: [-1, 0, 0], v: [[-hx,-hy,-hz], [-hx,-hy,hz], [-hx,hy,hz], [-hx,hy,-hz]] },
+          // Top (+Y)
+          { n: [0, 1, 0],  v: [[-hx,hy,hz], [hx,hy,hz], [hx,hy,-hz], [-hx,hy,-hz]] },
+          // Bottom (-Y)
+          { n: [0, -1, 0], v: [[-hx,-hy,-hz], [hx,-hy,-hz], [hx,-hy,hz], [-hx,-hy,hz]] }
+        ];
+        const uvs = [[0,0], [1,0], [1,1], [0,1]];
+        for (const f of faces) {
+          const i0 = this.addVertex(cx+f.v[0][0], cy+f.v[0][1], cz+f.v[0][2], f.n[0], f.n[1], f.n[2], uvs[0][0], uvs[0][1], matId, flow);
+          const i1 = this.addVertex(cx+f.v[1][0], cy+f.v[1][1], cz+f.v[1][2], f.n[0], f.n[1], f.n[2], uvs[1][0], uvs[1][1], matId, flow);
+          const i2 = this.addVertex(cx+f.v[2][0], cy+f.v[2][1], cz+f.v[2][2], f.n[0], f.n[1], f.n[2], uvs[2][0], uvs[2][1], matId, flow);
+          const i3 = this.addVertex(cx+f.v[3][0], cy+f.v[3][1], cz+f.v[3][2], f.n[0], f.n[1], f.n[2], uvs[3][0], uvs[3][1], matId, flow);
+          this.indices.push(i0, i1, i2, i0, i2, i3);
+        }
+      }
+
+      // 3D Oriented Cylinder between point A(x1,y1,z1) and point B(x2,y2,z2)
+      addCylinder(x1, y1, z1, x2, y2, z2, r, segs, matId, flow = 0, capped = true) {
+        let dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+        const len = Math.hypot(dx, dy, dz);
+        if (len < 1e-5) return;
+        dx /= len; dy /= len; dz /= len;
+
+        // Orthonormal basis (U, V) perpendicular to axis D
+        let ux = -dz, uy = 0, uz = dx;
+        if (Math.hypot(ux, uz) < 1e-3) { ux = 1; uy = 0; uz = 0; }
+        let uLen = Math.hypot(ux, uy, uz);
+        ux /= uLen; uy /= uLen; uz /= uLen;
+        const vx = dy * uz - dz * uy;
+        const vy = dz * ux - dx * uz;
+        const vz = dx * uy - dy * ux;
+
+        const ring1 = [], ring2 = [];
+        for (let s = 0; s <= segs; s++) {
+          const u = s / segs;
+          const a = u * Math.PI * 2;
+          const ca = Math.cos(a), sa = Math.sin(a);
+          const nx = ux * ca + vx * sa;
+          const ny = uy * ca + vy * sa;
+          const nz = uz * ca + vz * sa;
+          ring1.push(this.addVertex(x1 + nx * r, y1 + ny * r, z1 + nz * r, nx, ny, nz, u, 0, matId, flow));
+          ring2.push(this.addVertex(x2 + nx * r, y2 + ny * r, z2 + nz * r, nx, ny, nz, u, 1, matId, flow + len * 2.0));
+        }
+        for (let s = 0; s < segs; s++) {
+          this.indices.push(ring1[s], ring2[s], ring2[s+1], ring1[s], ring2[s+1], ring1[s+1]);
+        }
+        if (capped) {
+          const c1 = this.addVertex(x1, y1, z1, -dx, -dy, -dz, 0.5, 0.5, matId, flow);
+          const c2 = this.addVertex(x2, y2, z2, dx, dy, dz, 0.5, 0.5, matId, flow + len * 2.0);
+          for (let s = 0; s < segs; s++) {
+            const a1 = (s / segs) * Math.PI * 2;
+            const a2 = ((s + 1) / segs) * Math.PI * 2;
+            const p1 = this.addVertex(x1 + (ux*Math.cos(a1)+vx*Math.sin(a1))*r, y1 + (uy*Math.cos(a1)+vy*Math.sin(a1))*r, z1 + (uz*Math.cos(a1)+vz*Math.sin(a1))*r, -dx, -dy, -dz, 0.5, 0.5, matId, flow);
+            const p2 = this.addVertex(x1 + (ux*Math.cos(a2)+vx*Math.sin(a2))*r, y1 + (uy*Math.cos(a2)+vy*Math.sin(a2))*r, z1 + (uz*Math.cos(a2)+vz*Math.sin(a2))*r, -dx, -dy, -dz, 0.5, 0.5, matId, flow);
+            this.indices.push(c1, p2, p1);
+
+            const q1 = this.addVertex(x2 + (ux*Math.cos(a1)+vx*Math.sin(a1))*r, y2 + (uy*Math.cos(a1)+vy*Math.sin(a1))*r, z2 + (uz*Math.cos(a1)+vz*Math.sin(a1))*r, dx, dy, dz, 0.5, 0.5, matId, flow);
+            const q2 = this.addVertex(x2 + (ux*Math.cos(a2)+vx*Math.sin(a2))*r, y2 + (uy*Math.cos(a2)+vy*Math.sin(a2))*r, z2 + (uz*Math.cos(a2)+vz*Math.sin(a2))*r, dx, dy, dz, 0.5, 0.5, matId, flow);
+            this.indices.push(c2, q1, q2);
+          }
+        }
+      }
+
+      // 3D Cubic Bezier Curved Tube (for Braided Coolant Hoses & Fiber Optic Patch Cables!)
+      addTubeBezier(p0, p1, p2, p3, r, tubeSegs, radSegs, matId, flowStart = 0) {
+        const rings = [];
+        for (let i = 0; i <= tubeSegs; i++) {
+          const t = i / tubeSegs;
+          const it = 1 - t;
+          // Position B(t)
+          const b0 = it*it*it, b1 = 3*it*it*t, b2 = 3*it*t*t, b3 = t*t*t;
+          const px = b0*p0[0] + b1*p1[0] + b2*p2[0] + b3*p3[0];
+          const py = b0*p0[1] + b1*p1[1] + b2*p2[1] + b3*p3[1];
+          const pz = b0*p0[2] + b1*p1[2] + b2*p2[2] + b3*p3[2];
+
+          // Tangent B'(t)
+          const d0 = 3*it*it, d1 = 6*it*t, d2 = 3*t*t;
+          let tx = d0*(p1[0]-p0[0]) + d1*(p2[0]-p1[0]) + d2*(p3[0]-p2[0]);
+          let ty = d0*(p1[1]-p0[1]) + d1*(p2[1]-p1[1]) + d2*(p3[1]-p2[1]);
+          let tz = d0*(p1[2]-p0[2]) + d1*(p2[2]-p1[2]) + d2*(p3[2]-p2[2]);
+          const tLen = Math.hypot(tx, ty, tz) || 1;
+          tx /= tLen; ty /= tLen; tz /= tLen;
+
+          let ux = -tz, uy = 0, uz = tx;
+          if (Math.hypot(ux, uz) < 1e-3) { ux = 1; uy = 0; uz = 0; }
+          const uLen = Math.hypot(ux, uy, uz);
+          ux /= uLen; uy /= uLen; uz /= uLen;
+          const vx = ty * uz - tz * uy;
+          const vy = tz * ux - tx * uz;
+          const vz = tx * uy - ty * ux;
+
+          const ring = [];
+          const flowVal = flowStart + t * 4.0;
+          for (let s = 0; s <= radSegs; s++) {
+            const u = s / radSegs;
+            const a = u * Math.PI * 2;
+            const ca = Math.cos(a), sa = Math.sin(a);
+            const nx = ux * ca + vx * sa;
+            const ny = uy * ca + vy * sa;
+            const nz = uz * ca + vz * sa;
+            ring.push(this.addVertex(px + nx * r, py + ny * r, pz + nz * r, nx, ny, nz, u, t, matId, flowVal));
+          }
+          rings.push(ring);
+        }
+        for (let i = 0; i < tubeSegs; i++) {
+          for (let s = 0; s < radSegs; s++) {
+            const a = rings[i][s], b = rings[i+1][s], c = rings[i+1][s+1], d = rings[i][s+1];
+            this.indices.push(a, b, c, a, c, d);
+          }
+        }
+      }
+
+      compileToVAO() {
+        const vao = gl.createVertexArray();
+        gl.bindVertexArray(vao);
+
+        const posBo = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, posBo);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+        const normBo = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normBo);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+
+        const uvBo = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, uvBo);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.uvs), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(2);
+        gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 0, 0);
+
+        const metaBo = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, metaBo);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.metas), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(3);
+        gl.vertexAttribPointer(3, 2, gl.FLOAT, false, 0, 0);
+
+        const ebo = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(this.indices), gl.STATIC_DRAW);
+
+        gl.bindVertexArray(null);
+        return { vao, count: this.indices.length };
+      }
+    }
+
+    // ============================================================================
+    // CONSTRUCT THE 3D ANATOMICAL HARDWARE & DATA CENTER WORLD
+    // ============================================================================
+    const meshes = {};
+
+    // Helper: Build an openable 48U Hyperscale Liquid-Cooled Rack Cabinet Frame
+    // (Leaves slot at HERO_TRAY_Y open for the articulated pull-out Compute Tray!)
+    function buildHeroRackCabinet(mb, rx, rz, isGpuRack) {
+      const w = 1.02, h = 2.42, d = 1.18;
+      const post = 0.045;
+
+      // 4 Structural Vertical Corner Posts + Top/Bottom Plinths
+      mb.addBox(rx - w/2 + post/2, h/2, rz - d/2 + post/2, post, h, post, MAT_CHASSIS_DARK);
+      mb.addBox(rx + w/2 - post/2, h/2, rz - d/2 + post/2, post, h, post, MAT_CHASSIS_DARK);
+      mb.addBox(rx - w/2 + post/2, h/2, rz + d/2 - post/2, post, h, post, MAT_CHASSIS_DARK);
+      mb.addBox(rx + w/2 - post/2, h/2, rz + d/2 - post/2, post, h, post, MAT_CHASSIS_DARK);
+      // Base Plinth & Top Header
+      mb.addBox(rx, 0.04, rz, w, 0.08, d, MAT_CHASSIS_DARK);
+      mb.addBox(rx, h - 0.03, rz, w, 0.06, d, MAT_CHASSIS_DARK);
+      // Side enclosures (cutaway viewing window in middle so side internals are visible too)
+      mb.addBox(rx - w/2 + 0.01, h/2, rz, 0.02, h - 0.12, d - 0.08, MAT_CHASSIS_DARK);
+      mb.addBox(rx + w/2 - 0.01, h/2, rz, 0.02, h - 0.12, d - 0.08, MAT_CHASSIS_DARK);
+      // Rear Cabinet Backwall (slightly recessed)
+      mb.addBox(rx, h/2, rz - d/2 + 0.02, w - 0.08, h - 0.1, 0.03, MAT_CHASSIS_DARK);
+
+      // 1. INTERNAL VERTICAL STAINLESS LIQUID COOLING MANIFOLDS (Left = 18°C Chilled Supply, Right = 42°C Warm Return)
+      const manSupplyX = rx - w/2 + 0.095;
+      const manReturnX = rx + w/2 - 0.095;
+      const manZ = rz + 0.18;
+      mb.addCylinder(manSupplyX, 0.12, manZ, manSupplyX, h + 0.65, manZ, 0.026, 16, MAT_COOLANT_COLD, 0.0);
+      mb.addCylinder(manReturnX, 0.12, manZ, manReturnX, h + 0.65, manZ, 0.026, 16, MAT_COOLANT_HOT, 1.5);
+
+      // 2. REAR 48V DC SOLID COPPER BUSBAR SPINE (Delivers 2,500 Amps from Rack Rectifier Shelf to every Tray!)
+      const busZ = rz - d/2 + 0.09;
+      mb.addBox(rx - 0.05, h/2, busZ, 0.035, h - 0.25, 0.018, MAT_COPPER_COLDPLATE, 0.0);
+      mb.addBox(rx + 0.05, h/2, busZ, 0.035, h - 0.25, 0.018, MAT_POWER_48V, 0.5);
+
+      // 3. IF NVIDIA GB200 NVL72: Rear Blind-Mate Copper NVLink5 Spine Cartridges (5,000+ coax twinax links!)
+      if (isGpuRack) {
+        for (let c = -3; c <= 3; c++) {
+          if (c === 0) continue;
+          mb.addBox(rx + c * 0.055, h/2, busZ + 0.035, 0.028, h - 0.35, 0.045, MAT_GOLD_CONTACT, 0.2);
+        }
+      }
+
+      // 4. POPULATE OTHER U-SLOTS IN THE RACK (Compute Trays, 48V Power Rectifier Shelf, Switch Trays)
+      for (let slot = 0; slot < 14; slot++) {
+        const sy = 0.22 + slot * 0.155;
+        // Skip the slot around HERO_TRAY_Y (1.305) because that's our animated pull-out Hero Tray!
+        if (Math.abs(sy - HERO_TRAY_Y) < 0.09) {
+          // Draw telescopic stainless steel slide rails for the hero tray
+          mb.addBox(rx - 0.38, HERO_TRAY_Y - 0.02, rz + 0.2, 0.025, 0.025, 1.15, MAT_ALUMINUM_BRUSHED);
+          mb.addBox(rx + 0.38, HERO_TRAY_Y - 0.02, rz + 0.2, 0.025, 0.025, 1.15, MAT_ALUMINUM_BRUSHED);
+          continue;
+        }
+
+        // Mid-Rack 48V Power Shelf & BBU (Slots 6 & 7) or NVLink Switch Trays
+        const isPowerShelf = (slot === 6);
+        const isSwitchTray = (slot === 7 || slot === 13);
+        const trayMat = isPowerShelf ? MAT_POWER_48V : (isSwitchTray ? MAT_ALUMINUM_BRUSHED : MAT_CHASSIS_DARK);
+
+        mb.addBox(rx, sy, rz - 0.02, 0.76, 0.115, 0.96, trayMat, slot * 0.3);
+        // Front Faceplate Accent & Status LED Strip
+        mb.addBox(rx, sy, rz + 0.465, 0.75, 0.09, 0.02, isGpuRack ? MAT_SILICON_DIE : MAT_FIBER_OPTIC, slot * 0.5);
+
+        // Manifold Branch Drop Hoses into each tray's Quick-Disconnect (QDC)
+        mb.addCylinder(manSupplyX, sy, manZ, manSupplyX + 0.07, sy, manZ - 0.05, 0.011, 10, MAT_COOLANT_COLD, slot);
+        mb.addCylinder(manReturnX, sy, manZ, manReturnX - 0.07, sy, manZ - 0.05, 0.011, 10, MAT_COOLANT_HOT, slot);
+      }
+    }
+
+    // Build Articulated Hinged Perforated Front Door (Local Origin at Hinge Axis!)
+    function buildArticulatedDoor(isGpuRack) {
+      const mb = new CadMeshBuilder();
+      const w = 0.98, h = 2.30;
+      // Door swings from left hinge (X = 0..+w for TPU, or right hinge for GPU)
+      const dir = isGpuRack ? -1 : 1;
+      const cx = dir * (w * 0.5);
+      const cy = 1.21;
+
+      // Outer Anodized Bezel Frame
+      mb.addBox(cx, cy + h/2 - 0.03, 0, w, 0.06, 0.035, MAT_ALUMINUM_BRUSHED);
+      mb.addBox(cx, cy - h/2 + 0.03, 0, w, 0.06, 0.035, MAT_ALUMINUM_BRUSHED);
+      mb.addBox(dir * 0.03, cy, 0, 0.06, h, 0.035, MAT_ALUMINUM_BRUSHED);
+      mb.addBox(dir * (w - 0.03), cy, 0, 0.06, h, 0.035, MAT_ALUMINUM_BRUSHED);
+
+      // Vertical Glowing Status Light Pipe & Grab Handle on Door Latch Side
+      mb.addBox(dir * (w - 0.07), cy, 0.025, 0.016, h - 0.25, 0.016, isGpuRack ? MAT_COOLANT_COLD : MAT_FIBER_OPTIC, 1.0);
+      mb.addCylinder(dir * (w - 0.11), cy - 0.18, 0.045, dir * (w - 0.11), cy + 0.18, 0.045, 0.014, 12, MAT_ALUMINUM_BRUSHED);
+
+      // Central Hexagonal Honeycomb Perforated Mesh Panel (Rendered with alpha cutout in fragment shader!)
+      mb.addBox(cx, cy, 0, w - 0.12, h - 0.12, 0.012, MAT_PERF_DOOR);
+
+      return mb.compileToVAO();
+    }
+
+    // Build Hyper-Detailed Pull-Out Compute Tray (Board, Silicon Dies, 12-Hi HBM3e Stacks, VRMs, QDCs, OSFP Optics!)
+    function buildComputeTray(isGpuRack) {
+      const mb = new CadMeshBuilder();
+      // Local coordinates centered on the tray (0, 0, 0)
+      const tw = 0.76, td = 0.96;
+
+      // 1. Sheet-Metal Tray Pan & Side Rail Channels
+      mb.addBox(0, -0.032, 0, tw, 0.016, td, MAT_ALUMINUM_BRUSHED);
+      mb.addBox(-tw/2 + 0.012, 0.0, 0, 0.024, 0.055, td, MAT_ALUMINUM_BRUSHED);
+      mb.addBox( tw/2 - 0.012, 0.0, 0, 0.024, 0.055, td, MAT_ALUMINUM_BRUSHED);
+
+      // 2. High-Density 28-Layer Impedance-Controlled Server Motherboard PCB (with procedural gold traces)
+      mb.addBox(0, -0.018, 0.02, tw - 0.06, 0.012, td - 0.08, MAT_PCB_BOARD);
+
+      // 3. Chip Packages:
+      // - Google TPU v6e Tray: 4x TPU v6e Packages in a 2x2 array (Front-Left [-0.17, +0.18] is our Level-4 Hero Chip!)
+      // - NVIDIA GB200 Tray: 4x Blackwell B200 GPUs + 2x Grace CPUs
+      const chipCoords = [
+        { x: -0.17, z:  0.18, isHero: true,  label: isGpuRack ? 'B200-GPU-0' : 'TPU-v6e-0' },
+        { x:  0.17, z:  0.18, isHero: false, label: isGpuRack ? 'B200-GPU-1' : 'TPU-v6e-1' },
+        { x: -0.17, z: -0.15, isHero: false, label: isGpuRack ? 'B200-GPU-2' : 'TPU-v6e-2' },
+        { x:  0.17, z: -0.15, isHero: false, label: isGpuRack ? 'B200-GPU-3' : 'TPU-v6e-3' }
+      ];
+
+      for (const cp of chipCoords) {
+        // A. Organic BGA Package Substrate (90mm x 90mm)
+        mb.addBox(cp.x, -0.006, cp.z, 0.145, 0.010, 0.145, MAT_BGA_SUBSTRATE);
+
+        // B. CoWoS-L / CoWoS-S Silicon Interposer (72mm x 72mm mirror finish)
+        mb.addBox(cp.x, 0.002, cp.z, 0.112, 0.006, 0.112, MAT_COWOS_INTERPOSER);
+
+        // C. Dual Reticle-Limit Compute Dies (TPU v6e Tensor Core MXU / Blackwell Dual-Reticle Die)
+        mb.addBox(cp.x, 0.008, cp.z - 0.015, 0.048, 0.007, 0.026, MAT_SILICON_DIE, 0.2);
+        mb.addBox(cp.x, 0.008, cp.z + 0.015, 0.048, 0.007, 0.026, MAT_SILICON_DIE, 0.6);
+
+        // D. 8x HBM3e 12-Hi Memory Stacks (4 on Left flank, 4 on Right flank of the Compute Dies!)
+        for (let hIdx = 0; hIdx < 4; hIdx++) {
+          const hz = cp.z - 0.024 + hIdx * 0.016;
+          // Left HBM3e 12-Hi Cube
+          mb.addBox(cp.x - 0.036, 0.0085, hz, 0.016, 0.008, 0.013, MAT_HBM_STACK, hIdx * 0.25);
+          // Right HBM3e 12-Hi Cube
+          mb.addBox(cp.x + 0.036, 0.0085, hz, 0.016, 0.008, 0.013, MAT_HBM_STACK, hIdx * 0.25);
+        }
+
+        // E. 48V-to-0.75V Multiphase VRM Power Stages & Inductors flanking North/South of socket
+        for (let v = -3; v <= 3; v++) {
+          mb.addBox(cp.x + v * 0.018, 0.004, cp.z + 0.088, 0.012, 0.014, 0.014, MAT_POWER_48V, Math.abs(v)*0.2);
+          mb.addBox(cp.x + v * 0.018, 0.004, cp.z - 0.088, 0.012, 0.014, 0.014, MAT_POWER_48V, Math.abs(v)*0.2);
+        }
+
+        // F. Stainless Socket Retention Frame around each complete TPU/GPU Package
+        mb.addBox(cp.x, -0.001, cp.z - 0.074, 0.152, 0.006, 0.006, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(cp.x, -0.001, cp.z + 0.074, 0.152, 0.006, 0.006, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(cp.x - 0.074, -0.001, cp.z, 0.006, 0.006, 0.142, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(cp.x + 0.074, -0.001, cp.z, 0.006, 0.006, 0.142, MAT_ALUMINUM_BRUSHED);
+
+        // For the 3 non-hero TPU/GPU sockets, show them with their Copper Cold Plates clamped on;
+        // For the Front-Left Hero TPU/GPU (cp.isHero), its Cold Plate can lift up to expose the Silicon Brain (Compute Die) & 8 HBM3e towers inside!
+        if (!cp.isHero) {
+          mb.addBox(cp.x, 0.022, cp.z, 0.125, 0.018, 0.125, MAT_COPPER_COLDPLATE);
+          mb.addCylinder(cp.x - 0.035, 0.031, cp.z, cp.x - 0.035, 0.052, cp.z, 0.010, 12, MAT_ALUMINUM_BRUSHED);
+          mb.addCylinder(cp.x + 0.035, 0.031, cp.z, cp.x + 0.035, 0.052, cp.z, 0.010, 12, MAT_ALUMINUM_BRUSHED);
+        }
+      }
+
+      // 3B. HOST CPUs & SYSTEM RAM IN THE CENTER LANE (X = 0.0)
+      // - On NVIDIA GB200 Tray: 2x Grace 72-Core ARM CPUs (with silver IHS lid & 512GB LPDDR5X memory chips) wired directly to the 4 Blackwell GPUs
+      // - On Google TPU v6e Tray: 2x Host Server CPUs (Google Axion ARM / Xeon with silver IHS lid & DDR5 DIMM sticks) that run Linux/JAX and feed instructions to the 4 TPUs
+      for (let g = -1; g <= 1; g += 2) {
+        const gz = g * 0.165;
+        // CPU Socket Substrate
+        mb.addBox(0.0, -0.005, gz, 0.074, 0.010, 0.074, MAT_BGA_SUBSTRATE);
+        // Classic Stepped Brushed-Silver CPU Integrated Heat Spreader (IHS Lid)
+        mb.addBox(0.0, 0.004, gz, 0.058, 0.008, 0.058, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(0.0, 0.010, gz, 0.044, 0.006, 0.044, MAT_ALUMINUM_BRUSHED);
+        // Gold High-Speed Chip-to-Chip (NVLink-C2C / PCIe Gen6) Bridge Traces connecting Center CPU -> Left & Right GPUs/TPUs
+        mb.addBox(-0.072, -0.010, gz, 0.065, 0.004, 0.022, MAT_GOLD_CONTACT);
+        mb.addBox( 0.072, -0.010, gz, 0.065, 0.004, 0.022, MAT_GOLD_CONTACT);
+
+        // System RAM flanking the CPU (DDR5 DIMM sticks on TPU Host / LPDDR5X packages on Grace CPU)
+        for (let d = -2; d <= 2; d++) {
+          if (d === 0) continue;
+          const dz = gz + d * 0.022;
+          mb.addBox(0.0, 0.006, dz, 0.062, isGpuRack ? 0.006 : 0.022, 0.004, MAT_HBM_STACK, Math.abs(d)*0.3);
+        }
+      }
+
+      // 4. DIRECT-TO-CHIP CURVED 3D LIQUID COOLING MANIFOLD HOSES & BLIND-MATE QDC VALVES
+      // Cold Supply enters from Left Rear QDC, feeds front & rear cold plates via smooth 3D Bezier hoses
+      mb.addCylinder(-0.31, 0.025, 0.44, -0.31, 0.025, -0.44, 0.014, 14, MAT_COOLANT_COLD, 0.0);
+      mb.addCylinder( 0.31, 0.025, 0.44,  0.31, 0.025, -0.44, 0.014, 14, MAT_COOLANT_HOT, 1.0);
+
+      // Curved 3D Bezier Braided Coolant Hoses into each chip package cold plate
+      for (const cp of chipCoords) {
+        const yTop = cp.isHero ? 0.042 : 0.048;
+        // Blue Chilled Supply Hose from Left Rail to Chip Inlet
+        mb.addTubeBezier(
+          [-0.31, 0.025, cp.z],
+          [-0.28, 0.075, cp.z],
+          [cp.x - 0.07, 0.085, cp.z],
+          [cp.x - 0.035, yTop, cp.z],
+          0.0085, 16, 10, MAT_COOLANT_COLD, 0.0
+        );
+        // Red Warm Return Hose from Chip Outlet to Right Rail
+        mb.addTubeBezier(
+          [cp.x + 0.035, yTop, cp.z],
+          [cp.x + 0.07, 0.085, cp.z],
+          [0.28, 0.075, cp.z],
+          [0.31, 0.025, cp.z],
+          0.0085, 16, 10, MAT_COOLANT_HOT, 1.5
+        );
+      }
+
+      // Dripless Blind-Mate Quick-Disconnect (QDC) Valves at Tray Connections
+      mb.addCylinder(-0.31, 0.025, 0.44, -0.36, 0.025, 0.44, 0.020, 14, MAT_ALUMINUM_BRUSHED);
+      mb.addCylinder( 0.31, 0.025, 0.44,  0.36, 0.025, 0.44, 0.020, 14, MAT_ALUMINUM_BRUSHED);
+
+      // 5. REAR BLIND-MATE 48V DC BUSBAR CLIP & NVLINK5 / TORUS BACKPLANE CONNECTORS
+      // Heavy gold-plated 48V finger clip at rear center (Z = -0.46)
+      mb.addBox(-0.05, 0.015, -0.46, 0.032, 0.048, 0.065, MAT_COPPER_COLDPLATE);
+      mb.addBox( 0.05, 0.015, -0.46, 0.032, 0.048, 0.065, MAT_GOLD_CONTACT);
+      // 48V Input Filter Capacitor Bank
+      for (let c = -4; c <= 4; c++) {
+        mb.addCylinder(c * 0.032, -0.01, -0.36, c * 0.032, 0.032, -0.36, 0.010, 12, MAT_POWER_48V, c * 0.2);
+      }
+      if (isGpuRack) {
+        // Rear NVLink5 Blind-Mate Cartridge Housings
+        for (let n = -3; n <= 3; n++) {
+          if (n === 0) continue;
+          mb.addBox(n * 0.055, 0.015, -0.465, 0.026, 0.045, 0.055, MAT_GOLD_CONTACT);
+        }
+      }
+
+      // 6. FRONT PANEL: 8x OSFP 1.6T OPTICAL TRANSCEIVERS & CURVED FIBER OPTIC PATCH CABLES
+      for (let o = 0; o < 8; o++) {
+        const ox = -0.245 + o * 0.07;
+        // Finned OSFP 1.6T Pluggable Optical Transceiver Cage
+        mb.addBox(ox, 0.008, 0.44, 0.044, 0.028, 0.095, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(ox, 0.008, 0.49, 0.036, 0.022, 0.025, MAT_GOLD_CONTACT);
+        // Curved Yellow/Aqua Single-Mode Fiber Optic Patch Cord looping from OSFP to side Fiber Guide
+        const sideTarget = (o < 4) ? -0.36 : 0.36;
+        mb.addTubeBezier(
+          [ox, 0.008, 0.50],
+          [ox, 0.008, 0.62],
+          [(ox + sideTarget) * 0.5, -0.02, 0.58],
+          [sideTarget, -0.01, 0.44],
+          0.0045, 16, 8, MAT_FIBER_OPTIC, o * 0.4
+        );
+      }
+
+      return mb.compileToVAO();
+    }
+
+    // Build Articulated Levitating Copper Cold-Plate & Skived Micro-Fin Cutaway for the Hero Chip!
+    function buildExplodableColdPlate() {
+      const mb = new CadMeshBuilder();
+      const cx = -0.17, cz = 0.18;
+
+      // 1. Machined C11000 Copper Baseplate Perimeter Frame
+      mb.addBox(cx, 0.016, cz - 0.054, 0.124, 0.008, 0.016, MAT_COPPER_COLDPLATE);
+      mb.addBox(cx, 0.016, cz + 0.054, 0.124, 0.008, 0.016, MAT_COPPER_COLDPLATE);
+      mb.addBox(cx - 0.054, 0.016, cz, 0.016, 0.008, 0.092, MAT_COPPER_COLDPLATE);
+      mb.addBox(cx + 0.054, 0.016, cz, 0.016, 0.008, 0.092, MAT_COPPER_COLDPLATE);
+
+      // 2. SKIVED 0.2mm MICRO-CHANNEL COPPER FINS + TURBULENT CHILLED LIQUID STREAM INSIDE!
+      // 18 ultra-fine copper micro-fins across the die & HBM footprint
+      for (let f = -8; f <= 8; f++) {
+        const fx = cx + f * 0.0052;
+        mb.addBox(fx, 0.019, cz, 0.0022, 0.012, 0.088, MAT_COPPER_COLDPLATE);
+      }
+      // Flowing Chilled Coolant Channel Base between the copper micro-fins
+      mb.addBox(cx, 0.015, cz, 0.092, 0.004, 0.090, MAT_COOLANT_COLD, 0.5);
+
+      // 3. Semi-Translucent Cutaway Top Manifold Cover + Inlet/Outlet G1/4" Barbs
+      mb.addBox(cx, 0.028, cz, 0.122, 0.006, 0.122, MAT_GLASS_CUTAWAY);
+      mb.addCylinder(cx - 0.035, 0.028, cz, cx - 0.035, 0.046, cz, 0.010, 14, MAT_COOLANT_COLD, 0.0);
+      mb.addCylinder(cx + 0.035, 0.028, cz, cx + 0.035, 0.046, cz, 0.010, 14, MAT_COOLANT_HOT, 1.0);
+
+      return mb.compileToVAO();
+    }
+
+    // Helper: Build a 25-Meter-Tall 500kV Double-Circuit Steel Lattice State Grid Transmission Tower (Pylon)
+    function add500kVPylon(mb, tx, tz) {
+      const h1 = 14.0, h2 = 18.8, h3 = 23.5, topH = 26.5;
+      const b0 = 2.8, b1 = 1.45, b2 = 1.05, b3 = 0.75;
+
+      // 4 Tapered Steel Lattice Corner Legs (Lower & Upper sections)
+      const corners0 = [[-b0,-b0], [b0,-b0], [b0,b0], [-b0,b0]];
+      const corners1 = [[-b1,-b1], [b1,-b1], [b1,b1], [-b1,b1]];
+      const corners3 = [[-b3,-b3], [b3,-b3], [b3,b3], [-b3,b3]];
+      for (let c = 0; c < 4; c++) {
+        mb.addCylinder(tx + corners0[c][0], 0, tz + corners0[c][1], tx + corners1[c][0], h1, tz + corners1[c][1], 0.14, 8, MAT_ALUMINUM_BRUSHED);
+        mb.addCylinder(tx + corners1[c][0], h1, tz + corners1[c][1], tx + corners3[c][0], h3, tz + corners3[c][1], 0.11, 8, MAT_ALUMINUM_BRUSHED);
+        // Lightning Ground Peak Spire at top
+        mb.addCylinder(tx + corners3[c][0], h3, tz + corners3[c][1], tx, topH, tz, 0.08, 6, MAT_ALUMINUM_BRUSHED);
+      }
+
+      // Horizontal & Diagonal Lattice X-Bracing Tiers
+      const braceHeights = [3.5, 7.0, 10.5, 14.0, 18.8, 23.5];
+      for (let i = 0; i < braceHeights.length; i++) {
+        const y = braceHeights[i];
+        const t = Math.min(y / h3, 1.0);
+        const bw = b0 * (1 - t) + b3 * t;
+        mb.addBox(tx, y, tz - bw, bw * 2, 0.14, 0.14, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(tx, y, tz + bw, bw * 2, 0.14, 0.14, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(tx - bw, y, tz, 0.14, 0.14, bw * 2, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(tx + bw, y, tz, 0.14, 0.14, bw * 2, MAT_ALUMINUM_BRUSHED);
+      }
+
+      // 3 Tiers of Double-Circuit High-Voltage Cross-Arms + Ceramic Insulator Strings
+      const arms = [
+        { y: h1, span: 5.2 },
+        { y: h2, span: 6.0 },
+        { y: h3, span: 4.8 }
+      ];
+      for (const a of arms) {
+        // Steel Truss Cross-Arm (oriented along Z/X diagonal)
+        mb.addBox(tx, a.y, tz, 0.45, 0.38, a.span * 2, MAT_ALUMINUM_BRUSHED);
+        // Hanging Ceramic HV Suspension Insulators at Left (-Z) and Right (+Z) Wingtips
+        for (let side of [-1, 1]) {
+          const iz = tz + side * (a.span - 0.25);
+          mb.addCylinder(tx, a.y, iz, tx, a.y - 1.45, iz, 0.14, 12, MAT_POWER_48V, a.y * 0.2);
+        }
+      }
+    }
+
+    // Helper: Build one of the 300MW Hyperscale AI Data Center Companion Halls (Buildings 2, 3, 4)
+    function addHyperscaleBuilding(mb, bx, bz, bw, bh, bd) {
+      // Main Architectural Precast & Dark Titanium Envelope
+      mb.addBox(bx, bh * 0.5, bz, bw, bh, bd, MAT_ARCH_CONCRETE);
+      // Recessed Dark Metallic Upper Clerestory Band
+      mb.addBox(bx, bh - 0.9, bz, bw + 0.12, 1.1, bd + 0.12, MAT_CHASSIS_DARK);
+      // Brushed Aluminum Side Mechanical Louver Wings (Intake Plenums)
+      mb.addBox(bx - bw * 0.5 - 0.2, bh * 0.42, bz, 0.4, bh * 0.72, bd - 2.4, MAT_ALUMINUM_BRUSHED);
+      mb.addBox(bx + bw * 0.5 + 0.2, bh * 0.42, bz, 0.4, bh * 0.72, bd - 2.4, MAT_ALUMINUM_BRUSHED);
+
+      // Vertical Architectural Fluted Fin Pilasters along Front & Back Facades
+      for (let fx = -bw * 0.42; fx <= bw * 0.42; fx += 2.6) {
+        mb.addBox(bx + fx, bh * 0.5, bz + bd * 0.5 + 0.12, 0.28, bh - 0.2, 0.24, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(bx + fx, bh * 0.5, bz - bd * 0.5 - 0.12, 0.28, bh - 0.2, 0.24, MAT_ALUMINUM_BRUSHED);
+      }
+
+      // Rooftop Overhanging Canopy Trim
+      mb.addBox(bx, bh + 0.15, bz, bw + 1.0, 0.30, bd + 1.0, MAT_ALUMINUM_BRUSHED);
+
+      // 5 Rows of Rooftop Monocrystalline Solar PV Arrays & Sawtooth Skylight Monitors
+      for (let r = -2; r <= 2; r++) {
+        const rz = bz + r * (bd * 0.17);
+        mb.addBox(bx, bh + 0.52, rz, bw - 2.4, 0.45, 2.2, MAT_CHASSIS_DARK);
+        mb.addBox(bx, bh + 0.78, rz, bw - 2.2, 0.10, 2.4, MAT_SOLAR_PV);
+      }
+    }
+
+    // Build Articulated Building 1 Roof & Solar Canopy (Sits on Building 1 at Level 0; Lifts away for Interior Zoom!)
+    function buildBuilding1Roof() {
+      const mb = new CadMeshBuilder();
+      const bh = 5.2, bz = -9.0, bw = 26.4, bd = 30.4;
+
+      // Perimeter Roof Overhang Frame (Leaves an Architectural Cutaway Skylight Window over the Hero Racks at Z = -2..+4!)
+      mb.addBox(0, bh + 0.18, -16.5, bw + 0.8, 0.32, 15.5, MAT_ALUMINUM_BRUSHED); // North Roof Deck
+      mb.addBox(-9.2, bh + 0.18, -0.8, 8.8, 0.32, 14.8, MAT_ALUMINUM_BRUSHED);    // West Roof Wing
+      mb.addBox( 9.2, bh + 0.18, -0.8, 8.8, 0.32, 14.8, MAT_ALUMINUM_BRUSHED);    // East Roof Wing
+      mb.addBox(0, bh + 0.18, 5.8, bw + 0.8, 0.32, 1.8, MAT_ALUMINUM_BRUSHED);    // South Front Canopy Brow
+
+      // Skylight Glass Cutaway Frame Rim around the central Hero Rack viewing portal
+      mb.addBox(0, bh + 0.38, -8.5, 10.4, 0.22, 0.35, MAT_GLASS_CUTAWAY);
+      mb.addBox(0, bh + 0.38,  4.8, 10.4, 0.22, 0.35, MAT_GLASS_CUTAWAY);
+      mb.addBox(-5.0, bh + 0.38, -1.85, 0.35, 0.22, 13.6, MAT_GLASS_CUTAWAY);
+      mb.addBox( 5.0, bh + 0.38, -1.85, 0.35, 0.22, 13.6, MAT_GLASS_CUTAWAY);
+
+      // Rooftop Monocrystalline Solar PV Arrays on North, West & East Roof Decks
+      for (let r = 0; r < 3; r++) {
+        const rz = -21.5 + r * 4.2;
+        mb.addBox(0, bh + 0.55, rz, bw - 2.6, 0.38, 2.4, MAT_CHASSIS_DARK);
+        mb.addBox(0, bh + 0.78, rz, bw - 2.4, 0.10, 2.6, MAT_SOLAR_PV);
+      }
+      mb.addBox(-9.2, bh + 0.68, -1.5, 6.8, 0.12, 10.5, MAT_SOLAR_PV);
+      mb.addBox( 9.2, bh + 0.68, -1.5, 6.8, 0.12, 10.5, MAT_SOLAR_PV);
+
+      return mb.compileToVAO();
+    }
+
+    // Build the 1.2-Gigawatt Exterior AI Campus & 500kV State Grid Interconnect around Building 1
+    function buildCampusExterior(mb) {
+      // 1. MACRO CAMPUS LANDSCAPE & ROADWAY PLANE (-140m to +150m, Y = -0.09m below interior floor)
+      mb.addBox(5.0, -0.09, -15.0, 290.0, 0.08, 220.0, MAT_CAMPUS_TERRAIN);
+
+      // 2. BUILDING 1 ARCHITECTURAL SHELL (Framing our Hero Interior Hall at X in [-13, +13], Z in [-24, +6])
+      // North Rear Architectural Wall
+      mb.addBox(0, 2.6, -24.0, 26.4, 5.2, 0.45, MAT_ARCH_CONCRETE);
+      // West Architectural Wall (with Portal Opening for Primary Cooling Loop Pipes)
+      mb.addBox(-13.0, 2.6, -13.5, 0.45, 5.2, 21.0, MAT_ARCH_CONCRETE);
+      mb.addBox(-13.0, 4.1,   1.5, 0.45, 2.2,  9.0, MAT_ARCH_CONCRETE);
+      // East Architectural Wall (with Portal Opening for 13.8kV Substation Busducts)
+      mb.addBox( 13.0, 2.6, -13.5, 0.45, 5.2, 21.0, MAT_ARCH_CONCRETE);
+      mb.addBox( 13.0, 4.1,   1.5, 0.45, 2.2,  9.0, MAT_ARCH_CONCRETE);
+      // South Front Showcase Entry Pylons (Wide open central viewing portal so you can see inside Building 1!)
+      mb.addBox(-10.8, 2.6, 6.0, 4.8, 5.2, 0.45, MAT_ARCH_CONCRETE);
+      mb.addBox( 10.8, 2.6, 6.0, 4.8, 5.2, 0.45, MAT_ARCH_CONCRETE);
+      mb.addBox(0, 4.95, 6.0, 17.2, 0.5, 0.45, MAT_ALUMINUM_BRUSHED);
+
+      // 3. BUILDINGS 2, 3, AND 4 (Completing the 4× 300MW = 1.2GW Hyperscale Quad-Campus!)
+      // Building 2 (North-East, behind Building 1)
+      addHyperscaleBuilding(mb,   0.0, -48.0, 26.0, 6.0, 26.0);
+      // Building 3 (South-West, across Central Hydro Spine from Building 1)
+      addHyperscaleBuilding(mb, -48.0,  -9.0, 26.0, 6.0, 30.0);
+      // Building 4 (North-West, behind Building 3)
+      addHyperscaleBuilding(mb, -48.0, -48.0, 26.0, 6.0, 26.0);
+
+      // 4. ELEVATED INTER-BUILDING OPTICAL FIBER & UTILITY SKYBRIDGES (Unifying all 4 Halls into 1 Supercomputer)
+      // Skybridge 1 <-> 2 (North-South Spine at X = 0, Z = -29.5)
+      mb.addBox(0.0, 3.8, -29.5, 3.4, 2.2, 11.0, MAT_CHASSIS_DARK);
+      mb.addBox(0.0, 4.95, -29.5, 3.6, 0.18, 11.0, MAT_FIBER_OPTIC, 0.0);
+      // Skybridge 3 <-> 4 (North-South Spine at X = -48, Z = -29.5)
+      mb.addBox(-48.0, 3.8, -29.5, 3.4, 2.2, 11.0, MAT_CHASSIS_DARK);
+      mb.addBox(-48.0, 4.95, -29.5, 3.6, 0.18, 11.0, MAT_FIBER_OPTIC, 1.0);
+      // East-West Optical Skybridges linking Hall 1 <-> Hall 3 and Hall 2 <-> Hall 4
+      mb.addBox(-24.0, 4.2, -14.0, 22.0, 1.4, 2.2, MAT_CHASSIS_DARK);
+      mb.addBox(-24.0, 4.95, -14.0, 22.4, 0.16, 1.2, MAT_FIBER_OPTIC, 0.5);
+      mb.addBox(-24.0, 4.2, -46.0, 22.0, 1.4, 2.2, MAT_CHASSIS_DARK);
+      mb.addBox(-24.0, 4.95, -46.0, 22.4, 0.16, 1.2, MAT_FIBER_OPTIC, 1.5);
+
+      // 5. CENTRAL 1.2GW ADIABATIC COOLING YARD & STRATIFIED THERMAL ENERGY STORAGE (TES) WATER SILOS (X = -24m)
+      // 4x Giant Cylindrical Stratified TES Chilled-Water Buffer Tanks (2 Million Gallons of 16°C Reserve Cooling!)
+      const tesZ = [-20.0, -27.5, -35.0, -42.5];
+      for (let i = 0; i < tesZ.length; i++) {
+        const tz = tesZ[i];
+        mb.addCylinder(-24.0, 0.0, tz, -24.0, 10.2, tz, 2.75, 24, MAT_ALUMINUM_BRUSHED);
+        mb.addCylinder(-24.0, 10.2, tz, -24.0, 10.8, tz, 2.35, 24, MAT_CHASSIS_DARK);
+        // Vertical Glowing Blue Chilled-Water Sight-Glass Level Strip on Silo
+        mb.addBox(-24.0, 5.1, tz + 2.78, 0.45, 8.6, 0.12, MAT_COOLANT_COLD, i * 0.4);
+      }
+      // Top Catwalk linking all 4 TES Water Silos
+      mb.addBox(-24.0, 10.85, -31.25, 1.6, 0.16, 26.0, MAT_ALUMINUM_BRUSHED);
+
+      // 8x Exterior Modular Adiabatic Hybrid Cooling Tower Banks in Central Yard (X = -24m, South & North Banks)
+      const bankZ = [-6.0, -1.5, 3.0, -52.0, -56.5];
+      for (let i = 0; i < bankZ.length; i++) {
+        const cz = bankZ[i];
+        mb.addBox(-24.0, 1.9, cz, 5.2, 3.8, 3.2, MAT_CHASSIS_DARK);
+        mb.addBox(-24.0, 1.9, cz + 1.62, 4.8, 3.2, 0.06, MAT_PERF_DOOR);
+        mb.addCylinder(-25.3, 3.8, cz, -25.3, 4.4, cz, 0.85, 20, MAT_ALUMINUM_BRUSHED);
+        mb.addCylinder(-22.7, 3.8, cz, -22.7, 4.4, cz, 0.85, 20, MAT_ALUMINUM_BRUSHED);
+      }
+
+      // Main Chilled-Water Supply (18°C Blue) & Warm Return (42°C Red) Pipe Bridges from Central Plant -> Building 1 Cooling Loop!
+      mb.addCylinder(-24.0, 1.15, -0.4, -8.6, 1.15, -0.4, 0.22, 16, MAT_COOLANT_COLD, 0.0);
+      mb.addCylinder(-24.0, 2.05, -0.4, -8.6, 2.05, -0.4, 0.22, 16, MAT_COOLANT_HOT, 1.5);
+      // North-South Central Hydro Trunk Headers linking TES Silos, Cooling Towers & All 4 Buildings
+      mb.addCylinder(-20.5, 1.15, -56.0, -20.5, 1.15, 4.0, 0.26, 16, MAT_COOLANT_COLD, 0.0);
+      mb.addCylinder(-20.5, 2.05, -56.0, -20.5, 2.05, 4.0, 0.26, 16, MAT_COOLANT_HOT, 1.0);
+      mb.addCylinder(-35.0, 1.15, -6.0, -24.0, 1.15, -6.0, 0.22, 16, MAT_COOLANT_COLD, 0.5);
+      mb.addCylinder(-35.0, 2.05, -6.0, -24.0, 2.05, -6.0, 0.22, 16, MAT_COOLANT_HOT, 1.5);
+
+      // 6. 500kV STATE ELECTRICAL GRID TRANSMISSION CORRIDOR & STEEL LATTICE PYLONS (East Corridor: X = +52m to +125m)
+      const pylonCoords = [
+        [52.0,  -5.0],
+        [82.0, -17.0],
+        [114.0, -31.0]
+      ];
+      for (const [px, pz] of pylonCoords) {
+        add500kVPylon(mb, px, pz);
+      }
+
+      // 3D Catenary Sagged 500kV High-Voltage Overhead Power Lines (Regional State Grid -> Pylon 3 -> Pylon 2 -> Pylon 1 -> Campus Gantry!)
+      const gridWaypoints = [
+        [142.0, -43.0],
+        [114.0, -31.0],
+        [82.0,  -17.0],
+        [52.0,   -5.0],
+        [35.5,   -5.0] // Campus 500kV Switchyard Dead-End Gantry
+      ];
+      const tierHeights = [12.6, 17.4, 22.1];
+      const tierSpans   = [4.9,  5.7,  4.5];
+
+      for (let w = 0; w < gridWaypoints.length - 1; w++) {
+        const [xA, zA] = gridWaypoints[w];
+        const [xB, zB] = gridWaypoints[w + 1];
+        const isFinalSpan = (w === gridWaypoints.length - 2);
+
+        for (let t = 0; t < 3; t++) {
+          const yA = tierHeights[t];
+          const yB = isFinalSpan ? 9.2 : tierHeights[t];
+          const sagY = Math.min(yA, yB) - 2.6; // Realistic gravity catenary sag
+
+          for (let side of [-1, 1]) {
+            const offA = side * tierSpans[t];
+            const offB = side * (isFinalSpan ? 4.2 : tierSpans[t]);
+            mb.addTubeBezier(
+              [xA, yA, zA + offA],
+              [xA * 0.66 + xB * 0.34, sagY, (zA + offA) * 0.66 + (zB + offB) * 0.34],
+              [xA * 0.34 + xB * 0.66, sagY, (zA + offA) * 0.34 + (zB + offB) * 0.66],
+              [xB, yB, zB + offB],
+              0.095, 16, 8, MAT_POWER_48V, w * 1.5 + t * 0.3
+            );
+          }
+        }
+      }
+
+      // 7. ON-SITE 1.2GW / 500kV-to-13.8kV MAIN GRID SWITCHING SUBSTATION & GIS YARD (X in [+20, +38], Z in [-24, +4])
+      // Substation Crushed-Stone & Concrete Equipment Pad
+      mb.addBox(29.0, 0.08, -9.5, 19.0, 0.16, 30.0, MAT_ARCH_CONCRETE);
+
+      // 500kV High-Voltage Steel H-Frame Dead-End Takeoff Gantry (at X = 35.5, Z = -5.0)
+      mb.addCylinder(35.5, 0, -11.5, 35.5, 10.2, -11.5, 0.28, 12, MAT_ALUMINUM_BRUSHED);
+      mb.addCylinder(35.5, 0,   1.5, 35.5, 10.2,   1.5, 0.28, 12, MAT_ALUMINUM_BRUSHED);
+      mb.addBox(35.5, 9.4, -5.0, 0.55, 0.55, 14.2, MAT_ALUMINUM_BRUSHED);
+
+      // 4x Massive 350 MVA Step-Down Autotransformers (500kV -> 34.5kV / 13.8kV)
+      for (let ti = 0; ti < 4; ti++) {
+        const tz = -19.5 + ti * 6.5;
+        // Main Oil-Filled Transformer Tank & Radiator Cooling Fin Banks
+        mb.addBox(28.5, 2.2, tz, 4.2, 4.4, 3.4, MAT_CHASSIS_DARK);
+        mb.addBox(28.5, 2.0, tz + 1.9, 3.6, 3.2, 0.45, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(28.5, 2.0, tz - 1.9, 3.6, 3.2, 0.45, MAT_ALUMINUM_BRUSHED);
+        // 3x High-Voltage Porcelain Bushings on Top of each 350MVA Autotransformer
+        for (let b = -1; b <= 1; b++) {
+          mb.addCylinder(29.2, 4.4, tz + b * 0.9, 30.4, 6.8, tz + b * 0.9, 0.16, 12, MAT_POWER_48V, ti + b);
+          mb.addCylinder(27.4, 4.4, tz + b * 0.9, 27.4, 5.9, tz + b * 0.9, 0.14, 12, MAT_COPPER_COLDPLATE);
+        }
+      }
+
+      // Direct 13.8kV Medium-Voltage Armored Busduct Bridges feeding from 500kV Main Switchyard -> Building 1's 13.8kV Transformer (X = +8.4m) & Buildings 2,3,4!
+      mb.addBox(15.2, 2.15, -0.6, 14.5, 0.48, 0.65, MAT_POWER_48V, 0.0);
+      // North-South 13.8kV Ring Busduct distributing power along the East Substation Spine to all 4 Data Halls
+      mb.addBox(22.0, 2.15, -24.0, 0.65, 0.52, 48.0, MAT_POWER_48V, 1.0);
+      mb.addBox(17.5, 2.15, -46.0, 9.5, 0.48, 0.65, MAT_POWER_48V, 2.0);
+
+      // 8. 2.4 GWh GRID-SCALE MEGAPACK BESS (BATTERY ENERGY STORAGE YARD) (X in [+20, +40], Z in [+9, +28])
+      mb.addBox(30.0, 0.08, 18.5, 22.0, 0.16, 20.0, MAT_ARCH_CONCRETE);
+      // 18x Megapack Lithium-Ion BESS Containers in 3 Rows of 6 + Grid-Forming Inverters
+      for (let row = 0; row < 3; row++) {
+        const rz = 11.5 + row * 6.5;
+        for (let col = 0; col < 3; col++) {
+          const cx = 23.0 + col * 6.8;
+          // Megapack Container Body & Thermal Exhaust Louvers
+          mb.addBox(cx, 1.45, rz, 5.4, 2.9, 1.85, MAT_ALUMINUM_BRUSHED);
+          mb.addBox(cx, 1.45, rz + 0.94, 5.0, 2.4, 0.05, MAT_CHASSIS_DARK);
+          // Amber/Gold Active BESS Charge/Discharge Status Bus Strip
+          mb.addBox(cx, 2.65, rz + 0.96, 4.8, 0.18, 0.06, MAT_POWER_48V, row + col);
+        }
+      }
+      // Heavy Busduct tying 2.4GWh BESS Yard -> Main 500kV/13.8kV Switchyard (Buffers 300MW+ AI Synchronous Load Steps!)
+      mb.addBox(22.0, 1.65, 5.5, 0.65, 0.48, 12.0, MAT_POWER_48V, 0.5);
+
+      // 9. ON-SITE CLEAN FIRM POWER PLANT / SMALL MODULAR REACTOR (SMR) & GEOTHERMAL BASELOAD DOME (X = +31, Z = -46)
+      mb.addBox(31.0, 0.1, -46.0, 20.0, 0.2, 22.0, MAT_ARCH_CONCRETE);
+      // Cylindrical Brushed-Titanium Containment Dome & Steam Turbine Generator Hall
+      mb.addCylinder(31.0, 0.2, -46.0, 31.0, 10.5, -46.0, 5.8, 28, MAT_ALUMINUM_BRUSHED);
+      mb.addCylinder(31.0, 10.5, -46.0, 31.0, 12.2, -46.0, 4.4, 28, MAT_GLASS_CUTAWAY);
+      mb.addBox(24.0, 3.2, -46.0, 5.5, 6.4, 11.0, MAT_ARCH_CONCRETE);
+      // Dedicated Clean Baseload Power Feeder into the Main Switchyard
+      mb.addBox(22.0, 2.15, -35.0, 0.65, 0.52, 22.0, MAT_POWER_48V, 1.5);
+
+      // 10. LONG-HAUL INTERSTATE & SUBSEA DARK-FIBER GATEWAY VAULTS (PoP / Point-of-Presence, South Entry: Z = +15 to +36)
+      // Dual Geographically Diverse East & West Fiber Meet-Me Shelters
+      for (let side of [-1, 1]) {
+        const fx = side * 7.5;
+        mb.addBox(fx, 1.6, 17.5, 4.6, 3.2, 3.8, MAT_ARCH_CONCRETE);
+        mb.addBox(fx, 3.3, 17.5, 4.8, 0.2, 4.0, MAT_ALUMINUM_BRUSHED);
+        // Low-Earth-Orbit / Telemetry Ground Station Radome Dish on Roof
+        mb.addCylinder(fx, 3.4, 17.5, fx, 4.9, 17.5, 1.15, 18, MAT_GLASS_CUTAWAY);
+
+        // Underground/Trench 400-Terabit Long-Haul Dark-Fiber Trunk Conduits marching in from Interstate Highway (Z = +38m) -> PoP Vault -> Building 1 MEMS OCS!
+        mb.addBox(fx, 0.15, 28.0, 0.42, 0.25, 18.0, MAT_FIBER_OPTIC, side);
+        mb.addTubeBezier(
+          [fx, 0.25, 15.6],
+          [fx, 0.25, 8.0],
+          [side * 1.35, 1.2, 4.0],
+          [side * 1.35, 2.75, 0.35],
+          0.08, 16, 8, MAT_FIBER_OPTIC, 0.0
+        );
+      }
+
+      // 11. 3,000-TON MAGNETIC-BEARING CENTRIFUGAL WATER CHILLER PLANT (Trane CenTraVac / York YZ, ~$1.5M each, X = -24m, Z = -10.5 & -14.5)
+      for (let ci = 0; ci < 2; ci++) {
+        const chZ = -10.5 - ci * 4.0;
+        // Concrete Chiller Skid Pad
+        mb.addBox(-24.0, 0.12, chZ, 6.2, 0.24, 3.0, MAT_ARCH_CONCRETE);
+        // Bottom Cylindrical Evaporator Barrel (Chills Rack Loop Water to 16°C)
+        mb.addCylinder(-26.4, 0.95, chZ - 0.55, -21.6, 0.95, chZ - 0.55, 0.62, 20, MAT_COOLANT_COLD, ci);
+        // Bottom Cylindrical Condenser Barrel (Rejects Heat to Adiabatic Tower Loop)
+        mb.addCylinder(-26.4, 0.95, chZ + 0.55, -21.6, 0.95, chZ + 0.55, 0.62, 20, MAT_ALUMINUM_BRUSHED);
+        // Top Magnetic-Levitation Centrifugal Compressor Volute & VFD Drive Cabinet
+        mb.addCylinder(-24.8, 1.85, chZ, -23.2, 1.85, chZ, 0.52, 18, MAT_COPPER_COLDPLATE);
+        mb.addBox(-22.2, 1.65, chZ, 0.95, 1.35, 1.4, MAT_CHASSIS_DARK);
+      }
+
+      // 12. 3.5MW V20 STANDBY DIESEL / HVO TURBINE GENERATOR LINEUP (Caterpillar 3516E / MTU 20V4000, ~$2.2M each, X = +16.8m, Z = -11..-35)
+      for (let gi = 0; gi < 4; gi++) {
+        const gz = -11.5 - gi * 7.2;
+        // Sub-Base Belly Fuel Tank (48-Hour HVO Renewable Diesel Reserve)
+        mb.addBox(16.8, 0.35, gz, 2.6, 0.70, 5.4, MAT_CHASSIS_DARK);
+        // Acoustic Weatherproof Generator Enclosure & Intake Louver Hood
+        mb.addBox(16.8, 1.85, gz, 2.45, 2.30, 5.0, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(16.8, 1.85, gz + 2.52, 2.1, 1.85, 0.08, MAT_PERF_DOOR);
+        // Amber 13.8kV Generator Paralleling Breaker Box
+        mb.addBox(18.1, 1.65, gz, 0.25, 1.4, 1.6, MAT_POWER_48V, gi * 0.5);
+        // Twin Vertical Brushed-Stainless Exhaust Muffler Stacks
+        mb.addCylinder(16.3, 3.0, gz - 1.4, 16.3, 5.4, gz - 1.4, 0.18, 14, MAT_ALUMINUM_BRUSHED);
+        mb.addCylinder(17.3, 3.0, gz - 1.4, 17.3, 5.4, gz - 1.4, 0.18, 14, MAT_ALUMINUM_BRUSHED);
+      }
+    }
+
+    // Build Complete Static World (1.2GW Exterior Campus + State Grid + Building 1 Interior Hall)
+    function buildStaticWorld() {
+      const mb = new CadMeshBuilder();
+
+      // 0. Build the 1.2GW Exterior AI Campus, 500kV State Grid Pylons, Switchyard, 2.4GWh BESS, TES Silos & Companion Halls
+      buildCampusExterior(mb);
+
+      // 1. Building 1 Interior Raised Data Center Floor Plane (25.6m x 29.6m inside Building 1 walls)
+      mb.addBox(0, -0.02, -9.0, 25.6, 0.04, 29.6, MAT_FLOOR);
+
+      // 2. HERO RACK A (Left: Google TPU v6e Superpod Rack at X = -1.35)
+      buildHeroRackCabinet(mb, TPU_RACK_X, RACK_Z, false);
+
+      // 3. HERO RACK B (Right: NVIDIA GB200 NVL72 Rack at X = +1.35)
+      buildHeroRackCabinet(mb, GPU_RACK_X, RACK_Z, true);
+
+      // 3B. PETABYTE ALL-FLASH NVMe-oF AI CHECKPOINT STORAGE RACK (VAST / WEKA / Pure FlashBlade//Exa, ~$1.2M/rack, at X = -2.85m)
+      const storX = -2.85;
+      mb.addBox(storX, 1.21, RACK_Z, 0.98, 2.42, 1.16, MAT_CHASSIS_DARK);
+      for (let u = 0; u < 16; u++) {
+        const uy = 0.20 + u * 0.135;
+        // High-Density 2U All-Flash E3.S Gen5 NVMe Enclosures with vertical gold/cyan flash drive LEDs
+        mb.addBox(storX, uy, 0.56, 0.88, 0.10, 0.04, (u >= 14) ? MAT_ALUMINUM_BRUSHED : MAT_SILICON_DIE, u * 0.3);
+        mb.addBox(storX, uy, 0.585, 0.84, 0.03, 0.015, MAT_GOLD_CONTACT);
+      }
+      // Redundant 800G RDMA Storage Fabric Fiber Bundle up to Overhead Raceway
+      mb.addTubeBezier(
+        [storX, 2.38, 0.35],
+        [storX, 2.62, 0.35],
+        [storX + 0.3, 2.75, 0.35],
+        [-1.35, 2.78, 0.35],
+        0.020, 14, 8, MAT_FIBER_OPTIC, 0.5
+      );
+
+      // 3C. 51.2 Tbps SCALE-OUT AI NETWORK SPINE SWITCH RACK (NVIDIA Quantum-X800 InfiniBand / Spectrum-X / Tomahawk-5, ~$450K/rack, at X = +2.85m)
+      const swX = 2.85;
+      mb.addBox(swX, 1.21, RACK_Z, 0.98, 2.42, 1.16, MAT_CHASSIS_DARK);
+      for (let u = 0; u < 12; u++) {
+        const uy = 0.25 + u * 0.175;
+        // Liquid-Cooled 64-Port 800G/1.6T OSFP Spine Switch Chassis
+        mb.addBox(swX, uy, 0.56, 0.88, 0.13, 0.04, MAT_ALUMINUM_BRUSHED);
+        mb.addBox(swX, uy, 0.585, 0.82, 0.06, 0.02, MAT_FIBER_OPTIC, u * 0.4);
+      }
+      // Massive Trunk of Yellow/Cyan Spine Fiber Bundles rising into the Overhead Raceway & Palomar MEMS OCS
+      mb.addTubeBezier(
+        [swX - 0.2, 2.38, 0.35],
+        [swX - 0.2, 2.65, 0.35],
+        [1.5, 2.75, 0.35],
+        [0.4, 2.78, 0.35],
+        0.028, 14, 10, MAT_FIBER_OPTIC, 1.2
+      );
+
+      // 3D. VESDA LASER SMOKE DETECTION & NOVEC 1230 (FK-5-1-12) CLEAN-AGENT GAS FIRE SUPPRESSION SKID (~$350K/zone, at X = -6.8m, Z = +1.8m)
+      const fireX = -6.8, fireZ = 1.8;
+      mb.addBox(fireX, 0.06, fireZ, 2.4, 0.12, 0.9, MAT_ALUMINUM_BRUSHED);
+      mb.addBox(fireX, 1.15, fireZ - 0.38, 2.3, 2.2, 0.08, MAT_CHASSIS_DARK);
+      // 6x Crimson-Red High-Pressure Novec 1230 Clean-Agent Steel Cylinders + Brass Discharge Valves
+      for (let fc = 0; fc < 6; fc++) {
+        const cx = fireX - 0.85 + fc * 0.34;
+        mb.addCylinder(cx, 0.12, fireZ, cx, 1.75, fireZ, 0.13, 16, MAT_COOLANT_HOT, fc * 0.2);
+        mb.addCylinder(cx, 1.75, fireZ, cx, 1.96, fireZ, 0.045, 12, MAT_GOLD_CONTACT);
+      }
+      // Brass Overhead Discharge Manifold Header & VESDA Laser Air-Sampling Control Box
+      mb.addCylinder(fireX - 0.95, 1.96, fireZ, fireX + 0.95, 1.96, fireZ, 0.038, 12, MAT_GOLD_CONTACT);
+      mb.addBox(fireX + 1.05, 1.35, fireZ, 0.32, 0.48, 0.22, MAT_COOLANT_HOT, 1.0);
+
+      // 4. OVERHEAD GOOGLE PALOMAR MEMS OPTICAL CIRCUIT SWITCH (OCS) & YELLOW FIBER RACEWAY (Y = 2.85m)
+      // Yellow Overhead Fiber Raceway tray spanning across the racks
+      mb.addBox(0, 2.75, 0.35, 16.0, 0.06, 0.34, MAT_FIBER_OPTIC, 0.0);
+      // Fiber patch drops from Hero Racks up into the Overhead Raceway
+      mb.addTubeBezier(
+        [TPU_RACK_X - 0.35, 2.38, 0.35],
+        [TPU_RACK_X - 0.35, 2.65, 0.35],
+        [TPU_RACK_X - 0.15, 2.75, 0.35],
+        [0.0, 2.78, 0.35],
+        0.022, 16, 10, MAT_FIBER_OPTIC, 0.0
+      );
+      mb.addTubeBezier(
+        [GPU_RACK_X + 0.35, 2.38, 0.35],
+        [GPU_RACK_X + 0.35, 2.65, 0.35],
+        [GPU_RACK_X + 0.15, 2.75, 0.35],
+        [0.0, 2.78, 0.35],
+        0.022, 16, 10, MAT_FIBER_OPTIC, 1.0
+      );
+      // Central Overhead Palomar MEMS Optical Circuit Switch (OCS) Cutaway Housing (X=0, Y=3.05, Z=0.35)
+      mb.addBox(0, 3.05, 0.35, 1.25, 0.46, 0.55, MAT_CHASSIS_DARK);
+      // 2D Gold MEMS Micro-Mirror Array & Laser Collimator inside OCS
+      mb.addBox(-0.28, 3.05, 0.58, 0.32, 0.28, 0.04, MAT_GOLD_CONTACT);
+      mb.addBox( 0.28, 3.05, 0.58, 0.32, 0.28, 0.04, MAT_GOLD_CONTACT);
+      // Internal Laser Optical Bounce Path between MEMS mirror arrays
+      mb.addCylinder(-0.26, 3.05, 0.58, 0.0, 3.16, 0.62, 0.012, 10, MAT_FIBER_OPTIC, 0.2);
+      mb.addCylinder( 0.0,  3.16, 0.62, 0.26, 3.05, 0.58, 0.012, 10, MAT_FIBER_OPTIC, 0.6);
+
+      // 5. LEFT WING (X = -4.5m to -9.5m): 1.5MW COOLANT DISTRIBUTION UNIT (CDU) & EXTERIOR ADIABATIC COOLING TOWER
+      const cduX = -4.6, cduZ = 0.0;
+      // CDU Stainless Skid Base & Frame
+      mb.addBox(cduX, 1.25, cduZ, 1.65, 2.50, 1.35, MAT_ALUMINUM_BRUSHED);
+      mb.addBox(cduX, 1.25, cduZ - 0.05, 1.48, 2.28, 1.20, MAT_CHASSIS_DARK);
+      // Brazed Stainless Plate Heat Exchanger Core (Transfers heat from Rack Secondary PG25 Loop to Tower Primary Loop)
+      for (let p = 0; p < 10; p++) {
+        const pz = cduZ + 0.15 + p * 0.045;
+        mb.addBox(cduX - 0.28, 1.35, pz, 0.55, 1.15, 0.024, (p % 2 === 0) ? MAT_COOLANT_COLD : MAT_COOLANT_HOT, p * 0.2);
+      }
+      // Dual Redundant Variable-Frequency Drive (VFD) Centrifugal Coolant Pumps
+      mb.addCylinder(cduX + 0.38, 0.45, cduZ + 0.35, cduX + 0.38, 1.15, cduZ + 0.35, 0.20, 20, MAT_COOLANT_COLD, 0.0);
+      mb.addCylinder(cduX + 0.38, 1.35, cduZ + 0.35, cduX + 0.38, 2.05, cduZ + 0.35, 0.20, 20, MAT_COOLANT_COLD, 1.0);
+
+      // Overhead Chilled Supply (18°C Blue) & Warm Return (42°C Red) Trunk Pipes connecting CDU <-> Hero Racks!
+      mb.addCylinder(cduX, 2.95, 0.18, GPU_RACK_X + 0.45, 2.95, 0.18, 0.055, 18, MAT_COOLANT_COLD, 0.0);
+      mb.addCylinder(cduX, 3.12, 0.18, GPU_RACK_X + 0.45, 3.12, 0.18, 0.055, 18, MAT_COOLANT_HOT, 2.0);
+
+      // Far-Left (X = -8.6m): Local Adiabatic Hybrid Cooling Tower Module tied into Central Cooling Yard
+      const towX = -8.6, towZ = -0.8;
+      mb.addBox(towX, 1.6, towZ, 2.6, 3.2, 2.4, MAT_CHASSIS_DARK);
+      mb.addBox(towX, 1.6, towZ + 1.21, 2.3, 2.6, 0.04, MAT_PERF_DOOR);
+      // Twin Induced-Draft Top Fan Shrouds
+      mb.addCylinder(towX - 0.65, 3.2, towZ, towX - 0.65, 3.65, towZ, 0.52, 24, MAT_ALUMINUM_BRUSHED);
+      mb.addCylinder(towX + 0.65, 3.2, towZ, towX + 0.65, 3.65, towZ, 0.52, 24, MAT_ALUMINUM_BRUSHED);
+      // Primary Facility Water Loop Pipes between Cooling Tower <-> CDU Heat Exchanger
+      mb.addCylinder(towX + 1.2, 0.85, towZ + 0.4, cduX - 0.8, 0.85, cduZ + 0.4, 0.07, 16, MAT_COOLANT_COLD, 0.0);
+      mb.addCylinder(towX + 1.2, 1.85, towZ + 0.4, cduX - 0.8, 1.85, cduZ + 0.4, 0.07, 16, MAT_COOLANT_HOT, 1.5);
+
+      // 6. RIGHT WING (X = +4.6m to +8.8m): POWER DELIVERY CHAIN (13.8kV Transformer -> BESS UPS -> 480V PDU -> 48V Busduct)
+      // A. 480V AC-to-48V DC Rectifier & Busduct Riser Skid (X = +4.6m)
+      const pduX = 4.6, pduZ = 0.0;
+      mb.addBox(pduX, 1.25, pduZ, 1.55, 2.50, 1.30, MAT_CHASSIS_DARK);
+      mb.addBox(pduX, 1.25, pduZ + 0.66, 1.35, 2.15, 0.04, MAT_POWER_48V, 0.2);
+      // Solid Copper 48V DC Overhead Busway feeding from Rectifier Skid into Both Hero Racks!
+      mb.addBox((TPU_RACK_X + pduX)*0.5, 3.30, -0.35, pduX - TPU_RACK_X + 0.4, 0.14, 0.14, MAT_POWER_48V, 0.0);
+      mb.addCylinder(TPU_RACK_X, 2.40, -0.35, TPU_RACK_X, 3.30, -0.35, 0.045, 12, MAT_COPPER_COLDPLATE);
+      mb.addCylinder(GPU_RACK_X, 2.40, -0.35, GPU_RACK_X, 3.30, -0.35, 0.045, 12, MAT_COPPER_COLDPLATE);
+      mb.addCylinder(pduX,       2.40, -0.35, pduX,       3.30, -0.35, 0.055, 12, MAT_POWER_48V);
+
+      // B. 13.8kV Medium-Voltage Cast-Coil Substation Transformer & Lithium-Ion BESS UPS (X = +8.4m)
+      const subX = 8.4, subZ = -0.6;
+      mb.addBox(subX, 1.55, subZ, 2.7, 3.1, 2.2, MAT_CHASSIS_DARK);
+      // 3-Phase Cast-Resin HV Transformer Windings (Phases A, B, C)
+      for (let ph = -1; ph <= 1; ph++) {
+        mb.addCylinder(subX + ph * 0.72, 0.35, subZ + 0.65, subX + ph * 0.72, 2.45, subZ + 0.65, 0.28, 24, MAT_COPPER_COLDPLATE, ph * 0.5);
+        // Ceramic HV Bushings on top
+        mb.addCylinder(subX + ph * 0.72, 3.1, subZ + 0.4, subX + ph * 0.72, 3.75, subZ + 0.4, 0.09, 16, MAT_POWER_48V, ph);
+      }
+      // 480V 3-Phase Armored Busduct connecting Substation Transformer -> PDU/Rectifier Skid
+      mb.addBox((pduX + subX)*0.5, 2.15, -0.3, subX - pduX, 0.24, 0.24, MAT_POWER_48V, 1.0);
+
+      // 7. BACKGROUND HYPERSCALE POD AISLES (For authentic depth & architectural atmosphere)
+      for (let row = 1; row <= 4; row++) {
+        const bz = -4.8 - row * 3.8;
+        for (let col = -5; col <= 5; col++) {
+          if (col === 0) continue; // Keep central spine aisle clear
+          const bx = col * 1.45 + (col > 0 ? 1.2 : -1.2);
+          mb.addBox(bx, 1.21, bz, 1.02, 2.42, 1.18, MAT_CHASSIS_DARK);
+          mb.addBox(bx, 1.21, bz + 0.60, 0.94, 2.28, 0.02, (col < 0) ? MAT_FIBER_OPTIC : MAT_COOLANT_COLD, col * 0.3);
+        }
+        // Overhead raceway for background row
+        mb.addBox(0, 2.95, bz, 22.0, 0.08, 0.25, MAT_FIBER_OPTIC, row);
+      }
+
+      // 8. ARCHITECTURAL COLUMNS & OVERHEAD LED LUMINAIRE BAFFLES
+      for (let z = -18; z <= 6; z += 6) {
+        mb.addBox(-11.8, 2.5, z, 0.45, 5.0, 0.45, MAT_CHASSIS_DARK);
+        mb.addBox( 11.8, 2.5, z, 0.45, 5.0, 0.45, MAT_CHASSIS_DARK);
+        mb.addBox(0, 4.85, z, 24.0, 0.18, 0.25, MAT_ALUMINUM_BRUSHED);
+      }
+
+      return mb.compileToVAO();
+    }
+
+    // Compile all Static & Articulated 3D Meshes
+    meshes.staticWorld  = buildStaticWorld();
+    meshes.bldg1Roof    = buildBuilding1Roof();
+    meshes.tpuDoor      = buildArticulatedDoor(false);
+    meshes.gpuDoor      = buildArticulatedDoor(true);
+    meshes.tpuTray      = buildComputeTray(false);
+    meshes.gpuTray      = buildComputeTray(true);
+    meshes.coldPlateLid = buildExplodableColdPlate();
+
+    // ============================================================================
+    // COOK-TORRANCE GGX PBR + PROCEDURAL LITHOGRAPHY & SUBSYSTEM FLOW SHADERS
+    // ============================================================================
+    const vsPbr = `#version 300 es
+    precision highp float;
+
+    layout(location = 0) in vec3 aPos;
+    layout(location = 1) in vec3 aNormal;
+    layout(location = 2) in vec2 aUv;
+    layout(location = 3) in vec2 aMeta; // x: matId, y: flowParam
+
+    uniform mat4 uViewProj;
+    uniform mat4 uModel;
+
+    out vec3 vWorldPos;
+    out vec3 vLocalPos;
+    out vec3 vNormal;
+    out vec2 vUv;
+    out vec2 vMeta;
+
+    void main() {
+      vec4 wp = uModel * vec4(aPos, 1.0);
+      vWorldPos = wp.xyz;
+      vLocalPos = aPos;
+      vNormal = mat3(uModel) * aNormal;
+      vUv = aUv;
+      vMeta = aMeta;
+      gl_Position = uViewProj * wp;
+    }
+    `;
+
+    const fsPbr = `#version 300 es
+    precision highp float;
+
+    in vec3 vWorldPos;
+    in vec3 vLocalPos;
+    in vec3 vNormal;
+    in vec2 vUv;
+    in vec2 vMeta;
+
+    uniform vec3 uCamPos;
+    uniform float uTime;
+    uniform int uTraceMode; // 0: All, 1: Cooling, 2: Power, 3: Optical/NVLink, 4: Silicon/HBM
+
+    out vec4 fragColor;
+
+    const float PI = 3.14159265359;
+
+    // Cook-Torrance GGX Microfacet Functions
+    float DistributionGGX(vec3 N, vec3 H, float roughness) {
+      float a = roughness * roughness;
+      float a2 = a * a;
+      float NdotH = max(dot(N, H), 0.0);
+      float NdotH2 = NdotH * NdotH;
+      float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+      denom = PI * denom * denom;
+      return a2 / max(denom, 0.0001);
+    }
+
+    float GeometrySchlickGGX(float NdotV, float roughness) {
+      float r = (roughness + 1.0);
+      float k = (r * r) / 8.0;
+      return NdotV / (NdotV * (1.0 - k) + k);
+    }
+
+    float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+      float NdotV = max(dot(N, V), 0.0);
+      float NdotL = max(dot(N, L), 0.0);
+      return GeometrySchlickGGX(NdotV, roughness) * GeometrySchlickGGX(NdotL, roughness);
+    }
+
+    vec3 FresnelSchlick(float cosTheta, vec3 F0) {
+      return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    }
+
+    // Procedural Studio / Data Center HDR Environment Reflection
+    vec3 sampleEnvMap(vec3 R, float roughness) {
+      float sky = clamp(R.y * 0.5 + 0.5, 0.0, 1.0);
+      vec3 zenith = vec3(0.08, 0.13, 0.22);
+      vec3 horizon = vec3(0.18, 0.24, 0.34);
+      vec3 nadir = vec3(0.02, 0.03, 0.05);
+      vec3 env = mix(nadir, mix(horizon, zenith, sky), smoothstep(0.0, 0.6, sky));
+
+      // Overhead Linear LED Strip Highlights in Reflection
+      float stripZ = smoothstep(0.15 + roughness * 0.4, 0.0, abs(fract(R.z * 2.5) - 0.5));
+      float stripY = step(0.15, R.y);
+      env += vec3(0.65, 0.80, 1.0) * stripZ * stripY * (1.0 - roughness * 0.7) * 0.65;
+      return env;
+    }
+
+    void main() {
+      int matId = int(vMeta.x + 0.5);
+      float flow = vMeta.y;
+
+      vec3 N = normalize(vNormal);
+      vec3 V = normalize(uCamPos - vWorldPos);
+
+      // Default PBR properties
+      vec3 albedo = vec3(0.15, 0.17, 0.20);
+      float metallic = 0.5;
+      float roughness = 0.35;
+      vec3 emissive = vec3(0.0);
+      float alpha = 1.0;
+
+      // Subsystem dimming/highlighting multiplier
+      bool isCoolingPart = (matId == 8 || matId == 9 || matId == 10 || matId == 15);
+      bool isPowerPart   = (matId == 12 || matId == 8 || matId == 14);
+      bool isOpticalPart = (matId == 11 || matId == 14);
+      bool isSiliconPart = (matId >= 3 && matId <= 7);
+
+      // --- MATERIAL DEFINITIONS & PROCEDURAL MICRO-DETAIL ---
+      if (matId == 0) {
+        // MAT_FLOOR: Polished Anthracite Data Center Raised Floor
+        vec2 tile = fract(vWorldPos.xz * 1.6667);
+        float seam = step(tile.x, 0.025) + step(tile.y, 0.025);
+        albedo = mix(vec3(0.055, 0.068, 0.088), vec3(0.02, 0.025, 0.035), clamp(seam, 0.0, 1.0));
+        metallic = 0.15;
+        roughness = mix(0.16, 0.7, clamp(seam, 0.0, 1.0));
+
+        // Illuminated Floor Interconnect Guide Lines between Hero Racks, CDU, and Power Substation
+        float coolingGuide = smoothstep(0.04, 0.0, abs(vWorldPos.z - 0.18)) * step(-8.6, vWorldPos.x) * step(vWorldPos.x, 1.4);
+        float powerGuide   = smoothstep(0.04, 0.0, abs(vWorldPos.z + 0.35)) * step(-1.4, vWorldPos.x) * step(vWorldPos.x, 8.5);
+        emissive += vec3(0.0, 0.68, 0.95) * coolingGuide * 0.35;
+        emissive += vec3(0.95, 0.62, 0.10) * powerGuide * 0.35;
+      }
+      else if (matId == 1) {
+        // MAT_CHASSIS_DARK: Anodized Obsidian Frame
+        albedo = vec3(0.07, 0.085, 0.11);
+        metallic = 0.75;
+        roughness = 0.32;
+      }
+      else if (matId == 2) {
+        // MAT_PERF_DOOR: Hexagonal Honeycomb Perforated Mesh Rack Door (Alpha Cutout!)
+        vec2 p = vWorldPos.xy * 65.0;
+        vec2 h = vec2(1.0, 1.73205);
+        vec2 a = mod(p, h) - h * 0.5;
+        vec2 b = mod(p - h * 0.5, h) - h * 0.5;
+        vec2 gv = (dot(a, a) < dot(b, b)) ? a : b;
+        float hexDist = max(abs(gv.x), dot(abs(gv), normalize(vec2(1.0, 1.73205))));
+        if (hexDist < 0.34) {
+          discard; // True see-through honeycomb holes!
+        }
+        albedo = vec3(0.16, 0.19, 0.24);
+        metallic = 0.85;
+        roughness = 0.25;
+      }
+      else if (matId == 3) {
+        // MAT_PCB_BOARD: 28-Layer Motherboard Soldermask with Gold Micro-Traces
+        albedo = vec3(0.03, 0.16, 0.11);
+        metallic = 0.2;
+        roughness = 0.35;
+        // Procedural High-Speed SerDes Differential Gold Traces
+        float traceX = smoothstep(0.45, 0.5, sin(vWorldPos.x * 520.0));
+        float traceZ = smoothstep(0.45, 0.5, sin(vWorldPos.z * 520.0));
+        float traces = clamp(traceX + traceZ, 0.0, 1.0);
+        albedo = mix(albedo, vec3(0.85, 0.68, 0.22), traces * 0.38);
+        metallic = mix(metallic, 0.88, traces * 0.38);
+        if (uTraceMode == 4 || uTraceMode == 3) {
+          float pulse = 0.5 + 0.5 * sin(uTime * 10.0 - (vWorldPos.x + vWorldPos.z) * 28.0);
+          emissive += vec3(0.1, 0.95, 0.65) * traces * pulse * 0.45;
+        }
+      }
+      else if (matId == 4) {
+        // MAT_BGA_SUBSTRATE: Organic Package Substrate with SMD Capacitor Array
+        albedo = vec3(0.08, 0.22, 0.18);
+        metallic = 0.25;
+        roughness = 0.3;
+        float smdGrid = step(0.75, fract(vWorldPos.x * 180.0)) * step(0.75, fract(vWorldPos.z * 180.0));
+        albedo = mix(albedo, vec3(0.85, 0.72, 0.35), smdGrid);
+      }
+      else if (matId == 5) {
+        // MAT_COWOS_INTERPOSER: Mirror-Polished Silicon Interposer
+        albedo = vec3(0.52, 0.58, 0.66);
+        metallic = 0.94;
+        roughness = 0.08;
+        float bridgeGrid = step(0.85, fract(vWorldPos.x * 420.0)) + step(0.85, fract(vWorldPos.z * 420.0));
+        emissive += vec3(0.15, 0.75, 0.95) * clamp(bridgeGrid, 0.0, 1.0) * (0.25 + 0.25 * sin(uTime * 8.0));
+      }
+      else if (matId == 6) {
+        // MAT_SILICON_DIE: Reticle-Limit Compute Die (Iridescent Lithography + Systolic Tensor Core Grid!)
+        float viewCos = max(dot(N, V), 0.0);
+        vec3 irid = 0.5 + 0.5 * cos(6.28318 * (viewCos * 1.8 + vec3(0.0, 0.33, 0.67)));
+        albedo = mix(vec3(0.22, 0.28, 0.38), irid, 0.55);
+        metallic = 0.96;
+        roughness = 0.06;
+
+        // Microscopic Tensor Core / Matrix Multiply Unit (MXU) Sub-Core Grid
+        vec2 coreGrid = fract(vWorldPos.xz * 260.0);
+        float coreCell = step(0.12, coreGrid.x) * step(0.12, coreGrid.y);
+        float wave = 0.5 + 0.5 * sin(uTime * 9.0 + vWorldPos.x * 60.0 + vWorldPos.z * 60.0);
+        emissive += mix(vec3(0.05, 0.65, 1.0), vec3(0.15, 1.0, 0.65), wave) * coreCell * (uTraceMode == 4 ? 0.85 : 0.32);
+      }
+      else if (matId == 7) {
+        // MAT_HBM_STACK: HBM3e 12-Hi Stacked Memory Cube (12 Visible DRAM Strata Layers!)
+        albedo = vec3(0.18, 0.22, 0.28);
+        metallic = 0.90;
+        roughness = 0.12;
+        // 12 horizontal DRAM die strata visible along vertical walls + golden TSV micro-bumps
+        float strata = smoothstep(0.35, 0.5, abs(fract(vWorldPos.y * 1450.0) - 0.5));
+        bool isSide = abs(N.y) < 0.5;
+        if (isSide) {
+          albedo = mix(albedo, vec3(0.95, 0.76, 0.25), strata * 0.75);
+          float memWave = 0.5 + 0.5 * sin(uTime * 12.0 - vWorldPos.y * 900.0);
+          emissive += vec3(0.15, 0.92, 0.65) * strata * memWave * (uTraceMode == 4 ? 0.95 : 0.35);
+        } else {
+          // Top HBM3e Vendor Laser Etch Grid
+          float topGrid = step(0.15, fract(vUv.x * 4.0)) * step(0.15, fract(vUv.y * 4.0));
+          emissive += vec3(0.08, 0.75, 0.55) * topGrid * 0.22;
+        }
+      }
+      else if (matId == 8) {
+        // MAT_COPPER_COLDPLATE: Pure Machined C11000 Copper (Cold Plate, Skived 0.2mm Micro-Fins & 48V Busbar)
+        albedo = vec3(0.96, 0.56, 0.36);
+        metallic = 0.95;
+        roughness = 0.16;
+        if (uTraceMode == 1 || uTraceMode == 2) {
+          float pulse = 0.5 + 0.5 * sin(uTime * 7.0 + vWorldPos.y * 8.0);
+          emissive += vec3(0.35, 0.18, 0.05) * pulse;
+        }
+      }
+      else if (matId == 9) {
+        // MAT_COOLANT_COLD: 18°C Chilled Supply Manifold & Braided Hose (Animated Blue Flow Stream!)
+        albedo = vec3(0.04, 0.48, 0.88);
+        metallic = 0.35;
+        roughness = 0.20;
+        float stream = 0.5 + 0.5 * sin(uTime * 9.0 - flow * 6.0 - (vWorldPos.x + vWorldPos.y + vWorldPos.z) * 8.0);
+        float boost = (uTraceMode == 1) ? 1.45 : 0.65;
+        emissive = vec3(0.05, 0.72, 1.0) * (0.35 + 0.65 * stream) * boost;
+      }
+      else if (matId == 10) {
+        // MAT_COOLANT_HOT: 42°C Warm Return Manifold & Braided Hose (Animated Thermal Orange-Red Flow!)
+        albedo = vec3(0.85, 0.24, 0.08);
+        metallic = 0.35;
+        roughness = 0.20;
+        float stream = 0.5 + 0.5 * sin(uTime * 9.0 - flow * 6.0 + (vWorldPos.x + vWorldPos.y + vWorldPos.z) * 8.0);
+        float boost = (uTraceMode == 1) ? 1.45 : 0.65;
+        emissive = vec3(1.0, 0.38, 0.08) * (0.35 + 0.65 * stream) * boost;
+      }
+      else if (matId == 11) {
+        // MAT_FIBER_OPTIC: Single-Mode Fiber Cables & Overhead Raceway (Laser Packet Bursts!)
+        albedo = vec3(0.92, 0.74, 0.10);
+        metallic = 0.2;
+        roughness = 0.22;
+        float packet = smoothstep(0.55, 1.0, sin(uTime * 15.0 - flow * 8.0 - (vWorldPos.x + vWorldPos.y + vWorldPos.z) * 6.0));
+        float boost = (uTraceMode == 3) ? 1.6 : 0.75;
+        emissive = (vec3(0.95, 0.75, 0.12) * 0.35 + vec3(0.35, 0.95, 1.0) * packet * 0.95) * boost;
+      }
+      else if (matId == 12) {
+        // MAT_POWER_48V: 13.8kV Transformer / 480V Busduct / 48V DC Busbar / VRM Power Stages
+        albedo = vec3(0.88, 0.58, 0.12);
+        metallic = 0.85;
+        roughness = 0.22;
+        float currentWave = 0.5 + 0.5 * sin(uTime * 11.0 - (vWorldPos.x - vWorldPos.y) * 5.0);
+        float boost = (uTraceMode == 2) ? 1.5 : 0.55;
+        emissive = vec3(1.0, 0.65, 0.10) * (0.3 + 0.7 * currentWave) * boost;
+      }
+      else if (matId == 13) {
+        // MAT_ALUMINUM_BRUSHED: Brushed Silver Anodized Aluminum Rails, OSFP Cages, CDU & QDCs
+        albedo = vec3(0.68, 0.73, 0.79);
+        metallic = 0.90;
+        roughness = 0.22;
+      }
+      else if (matId == 14) {
+        // MAT_GOLD_CONTACT: 24K Gold Blind-Mate Connectors, NVLink5 Spine & MEMS OCS Mirror Array
+        albedo = vec3(1.0, 0.78, 0.28);
+        metallic = 0.96;
+        roughness = 0.12;
+        if (uTraceMode == 2 || uTraceMode == 3) {
+          emissive += vec3(0.55, 0.40, 0.08) * (0.5 + 0.5 * sin(uTime * 10.0));
+        }
+      }
+      else if (matId == 15) {
+        // MAT_GLASS_CUTAWAY: Engineering Cutaway Top Cover
+        albedo = vec3(0.35, 0.75, 0.95);
+        metallic = 0.1;
+        roughness = 0.08;
+        emissive = vec3(0.08, 0.35, 0.55);
+      }
+      else if (matId == 16) {
+        // MAT_CAMPUS_TERRAIN: 1.2GW Exterior Campus Landscape, Perimeter Roadways & Illuminated Utility Corridors
+        vec2 grid10 = fract(vWorldPos.xz * 0.1);
+        float majorGrid = step(grid10.x, 0.018) + step(grid10.y, 0.018);
+        albedo = mix(vec3(0.032, 0.042, 0.056), vec3(0.06, 0.08, 0.11), clamp(majorGrid, 0.0, 1.0));
+        metallic = 0.12;
+        roughness = 0.48;
+
+        // Campus Perimeter Boulevard & Internal Service Roadways
+        float roadZ1 = smoothstep(2.2, 1.8, abs(vWorldPos.z - 10.5)) * step(-65.0, vWorldPos.x) * step(vWorldPos.x, 45.0);
+        float roadZ2 = smoothstep(2.2, 1.8, abs(vWorldPos.z + 30.0)) * step(-65.0, vWorldPos.x) * step(vWorldPos.x, 45.0);
+        float roadX1 = smoothstep(2.2, 1.8, abs(vWorldPos.x - 16.5)) * step(-62.0, vWorldPos.z) * step(vWorldPos.z, 32.0);
+        float road = clamp(roadZ1 + roadZ2 + roadX1, 0.0, 1.0);
+        albedo = mix(albedo, vec3(0.075, 0.09, 0.115), road);
+        roughness = mix(roughness, 0.28, road);
+
+        // Glowing Roadway Edge Striping
+        float roadEdge = smoothstep(0.18, 0.0, abs(abs(vWorldPos.z - 10.5) - 1.9)) * step(-64.0, vWorldPos.x) * step(vWorldPos.x, 44.0);
+        emissive += vec3(0.12, 0.55, 0.85) * roadEdge * 0.35;
+      }
+      else if (matId == 17) {
+        // MAT_ARCH_CONCRETE: Fluted Architectural Precast Concrete & Titanium Cladding with Clerestory Light Ribbons
+        float flute = 0.5 + 0.5 * sin(vWorldPos.x * 8.0 + vWorldPos.z * 8.0);
+        albedo = mix(vec3(0.22, 0.25, 0.30), vec3(0.30, 0.34, 0.40), flute);
+        metallic = 0.35;
+        roughness = 0.36;
+        // Glowing Horizontal Architectural Clerestory Window Ribbon near Building Roofline
+        float windowBand = smoothstep(0.22, 0.0, abs(fract(vWorldPos.y * 0.35) - 0.72)) * step(1.5, vWorldPos.y);
+        emissive += vec3(0.15, 0.72, 1.0) * windowBand * 0.55;
+      }
+      else if (matId == 18) {
+        // MAT_SOLAR_PV: Monocrystalline Silicon Photovoltaic Rooftop Solar Panels
+        vec2 cell = fract(vWorldPos.xz * 2.5);
+        float busbar = step(cell.x, 0.05) + step(cell.y, 0.05);
+        albedo = mix(vec3(0.03, 0.11, 0.28), vec3(0.65, 0.75, 0.88), clamp(busbar, 0.0, 1.0) * 0.55);
+        metallic = 0.82;
+        roughness = 0.10;
+      }
+
+      // --- COOK-TORRANCE GGX MULTI-LIGHT PBR EVALUATION ---
+      vec3 F0 = mix(vec3(0.04), albedo, metallic);
+      vec3 Lo = vec3(0.0);
+
+      // 3 Key Industrial Studio Lights
+      vec3 lightDirs[3] = vec3[3](
+        normalize(vec3(0.35, 0.85, 0.45)),
+        normalize(vec3(-0.55, 0.65, 0.35)),
+        normalize(vec3(0.0, 0.45, -0.85))
+      );
+      vec3 lightCols[3] = vec3[3](
+        vec3(1.85, 1.82, 1.78),
+        vec3(0.95, 1.15, 1.45),
+        vec3(0.75, 0.85, 1.05)
+      );
+
+      for (int i = 0; i < 3; i++) {
+        vec3 L = lightDirs[i];
+        vec3 H = normalize(V + L);
+        float NdotL = max(dot(N, L), 0.0);
+        if (NdotL > 0.0) {
+          float NDF = DistributionGGX(N, H, roughness);
+          float G   = GeometrySmith(N, V, L, roughness);
+          vec3  F   = FresnelSchlick(max(dot(H, V), 0.0), F0);
+
+          vec3 numerator = NDF * G * F;
+          float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 0.0001;
+          vec3 specular = numerator / denominator;
+
+          vec3 kS = F;
+          vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+          Lo += (kD * albedo / PI + specular) * lightCols[i] * NdotL;
+        }
+      }
+
+      // Image-Based Lighting (Procedural Studio Environment Reflection)
+      vec3 R = reflect(-V, N);
+      vec3 F_env = FresnelSchlick(max(dot(N, V), 0.0), F0);
+      vec3 envSpec = sampleEnvMap(R, roughness) * F_env * (1.0 - roughness * 0.45);
+      vec3 ambient = albedo * (1.0 - metallic) * 0.16 + envSpec * 0.85;
+
+      vec3 color = ambient + Lo + emissive;
+
+      // Subtle Subsystem Focus Dimming when a specific Trace Mode (1..4) is selected
+      if (uTraceMode == 1 && !isCoolingPart && matId != 0 && matId != 16) color *= 0.38;
+      if (uTraceMode == 2 && !isPowerPart   && matId != 0 && matId != 16) color *= 0.38;
+      if (uTraceMode == 3 && !isOpticalPart && matId != 0 && matId != 16) color *= 0.38;
+      if (uTraceMode == 4 && !isSiliconPart && matId != 0 && matId != 16) color *= 0.38;
+
+      // ACES Filmic Tone Mapping & Gamma Correction
+      color = (color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14);
+      color = pow(clamp(color, 0.0, 1.0), vec3(1.0 / 2.2));
+
+      // Long-Range Campus Horizon Fog (Crystal clear up to 165m so the entire 1.2GW Campus & 500kV Grid Pylons are sharp!)
+      float dist = length(uCamPos - vWorldPos);
+      float fog = clamp(exp(-max(dist - 165.0, 0.0) * 0.0075), 0.0, 1.0);
+      color = mix(vec3(0.024, 0.032, 0.048), color, fog);
+
+      fragColor = vec4(color, alpha);
+    }
+    `;
+
+    function compileProgram(vsSrc, fsSrc) {
+      const p = gl.createProgram();
+      const s1 = gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(s1, vsSrc);
+      gl.compileShader(s1);
+      if (!gl.getShaderParameter(s1, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s1));
+
+      const s2 = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(s2, fsSrc);
+      gl.compileShader(s2);
+      if (!gl.getShaderParameter(s2, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s2));
+
+      gl.attachShader(p, s1);
+      gl.attachShader(p, s2);
+      gl.linkProgram(p);
+      return p;
+    }
+
+    const pbrProg = compileProgram(vsPbr, fsPbr);
+
+    // ============================================================================
+    // INTERACTIVE PLAIN-ENGLISH GLOSSARY DICTIONARY (20+ HARDWARE & FACILITY TERMS)
+    // ============================================================================
+    state.plainEnglishMode = true;
+    state.activeGlossKey = 'tpu_v6e';
+
+    const GLOSSARY = {
+      tpu_v6e: {
+        title: 'TPU v6e / Trillium',
+        expansion: 'Tensor Processing Unit (Gen 6 Efficiency)',
+        patterns: ['TPU v6e', 'Trillium'],
+        plain: '<strong>TPU</strong> is Google’s custom-designed AI chip built specifically for matrix math (running models like Gemini). <strong>v6e</strong> means <em>Version 6, Efficiency</em>, and <strong>Trillium</strong> is Google’s official codename for this 6th-generation chip.'
+      },
+      u_48: {
+        title: '48U Rack Height',
+        expansion: '48 Rack Units (1U = 1.75 inches / 44.45 mm)',
+        patterns: ['48U', '1U'],
+        plain: '<strong>"U"</strong> stands for <em>Rack Unit</em>—a standard vertical slot height of 1.75 inches. A <strong>48U rack</strong> is a 7.5-foot-tall cabinet with 48 vertical slots where server trays, switches, and power shelves slide in like oven racks.'
+      },
+      busbar_48v: {
+        title: '48V Copper Busbar',
+        expansion: '48-Volt DC Solid Copper Power Spine',
+        patterns: ['48V Copper Busbar', '48V DC solid copper vertical busbar', '48V busbar', '48V copper spine', '48V DC'],
+        plain: 'Instead of hundreds of tangled power cords, a thick <strong>solid bar of pure copper</strong> runs vertically up the back of the rack at <strong>48 Volts DC</strong>. Why 48V instead of 12V? Quadrupling voltage cuts current by 4×, which cuts wasted wire heat ($I^2R$) by <strong>16×</strong>!'
+      },
+      manifold_18c: {
+        title: '18°C Blue / 42°C Return Manifold',
+        expansion: 'Vertical Liquid Distribution Header Pipe',
+        patterns: ['18°C Blue Manifold', 'Return Manifold', 'manifolds', 'Manifolds'],
+        plain: 'A <strong>manifold</strong> is a main vertical water pipe with dozens of side branch nozzles (like a multi-outlet power strip, but for water). The <strong>18°C (64°F) Blue Manifold</strong> feeds cold liquid into every server tray; the <strong>42°C (108°F) Red Manifold</strong> collects the hot liquid leaving the chips.'
+      },
+      braided_qdc: {
+        title: 'Braided QDC Hose',
+        expansion: 'Braided Quick-Disconnect Coupling Hose',
+        patterns: ['Braided QDC Hose', 'Quick-Disconnect (QDC)', 'QDC'],
+        plain: '<strong>QDC</strong> = <em>Quick-Disconnect Coupling</em>: a spring-loaded dripless valve that seals itself shut in milliseconds when you pull a server tray out so zero water spills onto the electronics. <strong>Braided</strong> means the flexible tube is wrapped in woven mesh so it never kinks or bursts.'
+      },
+      osfp_16t: {
+        title: 'Front OSFP 1.6T Optic',
+        expansion: 'Octal Small Form-factor Pluggable (1.6 Terabits/sec)',
+        patterns: ['OSFP 1.6T', 'OSFP 1.6 Tbps', 'OSFP'],
+        plain: '<strong>OSFP</strong> is a metal plug-in module (about the size of a pack of gum with cooling fins) on the front of the server tray. Inside, tiny lasers convert electrical data into light pulses at <strong>1.6 Terabits per second</strong> (1,600× faster than gigabit home internet).'
+      },
+      fiber_raceway: {
+        title: 'Yellow Fiber Raceway',
+        expansion: 'Overhead Fiber-Optic Cable Trough',
+        patterns: ['Fiber Raceway', 'raceway'],
+        plain: 'A <strong>raceway</strong> is a bright yellow overhead highway trough suspended above the racks. It cradles thousands of delicate glass fiber-optic cables so they stay organized, never get pinched, and stay separated from heavy copper power lines.'
+      },
+      mems_ocs: {
+        title: 'Overhead MEMS OCS',
+        expansion: 'Micro-Electro-Mechanical Systems Optical Circuit Switch',
+        patterns: ['MEMS Optical Circuit Switch', 'MEMS OCS', 'Palomar MEMS'],
+        plain: '<strong>MEMS</strong> are microscopic moving machines etched in silicon. Inside Google’s overhead switch, hundreds of <strong>tiny motorized gold mirrors</strong> physically tilt to bounce laser beams from one rack’s fiber directly into another rack’s fiber—rewiring the supercomputer with pure light!'
+      },
+      blind_mate: {
+        title: 'Blind-Mate Connector',
+        expansion: 'Self-Aligning Plug-On-Slide Connection',
+        patterns: ['Blind-Mate', 'blind-mate'],
+        plain: '<strong>Blind-mate</strong> means a technician doesn’t have to reach behind the rack to plug in cables by hand. Simply sliding the server tray forward into its slot automatically aligns and snaps the rear power, water (QDC), and data pins into place.'
+      },
+      nvlink_spine: {
+        title: 'NVLink5 Copper Spine',
+        expansion: '5th-Gen NVIDIA High-Speed GPU Backplane (1.8 TB/s per GPU)',
+        patterns: ['NVLink5', 'NVLink'],
+        plain: '<strong>NVLink5</strong> is NVIDIA’s ultra-fast direct wire link between GPUs. In the GB200 rack, over 5,000 thick copper twinax cables run vertically up the back ("the spine") so all 72 GPUs talk to each other as if they were one giant chip.'
+      },
+      cowos: {
+        title: 'CoWoS Silicon Interposer',
+        expansion: 'Chip-on-Wafer-on-Substrate (TSMC 2.5D Packaging)',
+        patterns: ['CoWoS', 'Silicon Interposer'],
+        plain: 'A regular circuit board has wires too thick to connect a GPU to HBM memory fast enough. <strong>CoWoS</strong> places the compute dies and HBM memory stacks side-by-side on a mirror-smooth <strong>silicon wafer base ("interposer")</strong> etched with 10,000+ microscopic wires.'
+      },
+      hbm3e: {
+        title: 'HBM3e 12-Hi Memory Stack',
+        expansion: 'High Bandwidth Memory Gen 3E (12 Vertically Stacked Dies)',
+        patterns: ['HBM3e', '12-Hi'],
+        plain: 'AI models need massive memory speed. Instead of flat RAM sticks, <strong>HBM3e</strong> stacks <strong>12 ultra-thin memory chips vertically like a 12-story skyscraper ("12-Hi")</strong> right next to the GPU/TPU die, feeding it up to 8 Terabytes of data every second.'
+      },
+      tsv: {
+        title: 'Through-Silicon Vias (TSVs)',
+        expansion: 'Microscopic Vertical Elevator Wires Through Silicon',
+        patterns: ['Through-Silicon Vias (TSVs)', 'TSVs'],
+        plain: 'How do you wire 12 stacked memory chips together vertically? Engineers laser-drill thousands of microscopic vertical tunnels straight through the silicon wafers—like <strong>high-speed elevator shafts</strong>—and fill them with copper/gold.'
+      },
+      skived_coldplate: {
+        title: 'Skived Micro-Fin Cold Plate',
+        expansion: 'Machined Copper Block with 0.2mm Shaved Micro-Channels',
+        patterns: ['skived 0.2mm micro-channel copper fins', 'skived', 'Cold Plate', 'Cold Plates', 'cold plates'],
+        plain: 'A <strong>cold plate</strong> is a solid copper block bolted directly onto the hot silicon chip. Inside, a precision blade shaves ("<strong>skives</strong>") paper-thin 0.2mm copper fins so chilled water touches a huge surface area and pulls 1,200W of heat away instantly.'
+      },
+      vrm_vpd: {
+        title: 'VRM & Vertical Power Delivery',
+        expansion: 'Voltage Regulator Module (48V → 0.75V @ 1,200 Amps)',
+        patterns: ['VRMs', 'VRM', 'Vertical Power Delivery (VPD)'],
+        plain: 'The rack busbar delivers 48 Volts, but microscopic transistors on a 3nm chip will fry above <strong>0.75 Volts</strong>. <strong>VRMs</strong> are compact power transformers surrounding the chip that step 48V down to 0.75V while pumping over 1,000 Amps directly into the silicon.'
+      },
+      cdu_exchanger: {
+        title: 'CDU & Plate Heat Exchanger',
+        expansion: 'Coolant Distribution Unit (1.5 Megawatt Liquid Pump Skid)',
+        patterns: ['Coolant Distribution Unit (CDU)', 'CDU', 'plate heat exchanger', 'Plate Heat Exchanger'],
+        plain: 'The <strong>CDU</strong> is the heart and kidneys of the rack cooling system. It filters and pumps ultra-clean coolant through the racks, and uses a stack of corrugated metal plates (<strong>Plate Heat Exchanger</strong>) to transfer heat to the outdoor cooling tower water without the two liquids ever mixing.'
+      },
+      adiabatic_pue: {
+        title: 'Adiabatic Tower & PUE',
+        expansion: 'Power Usage Effectiveness (1.00 = Perfect Efficiency)',
+        patterns: ['Adiabatic Hybrid Cooling Tower', 'Adiabatic', 'PUE'],
+        plain: '<strong>Adiabatic towers</strong> cool water using outdoor air first and only mist water on scorching days, saving millions of gallons. <strong>PUE</strong> measures facility efficiency: a PUE of <strong>1.06</strong> means only 6% extra energy is spent on cooling/power overhead for every 100W used by the AI chips!'
+      },
+      substation_bess: {
+        title: '13.8kV Transformer & BESS',
+        expansion: 'Medium-Voltage Grid Transformer & Battery Energy Storage System',
+        patterns: ['13.8kV', 'BESS', '480V', 'Megapack'],
+        plain: 'Power arrives at the building at <strong>13,800 Volts (13.8kV)</strong> and is stepped down by heavy copper-coil transformers to <strong>480V</strong>. <strong>BESS</strong> (giant grid-scale lithium Megapack batteries) act as shock absorbers when 500,000 AI chips suddenly spike from idle to full load in a millisecond.'
+      },
+      grid_500kv: {
+        title: '500kV State Transmission Grid',
+        expansion: '500,000-Volt Extra-High-Voltage Regional Bulk Power Grid',
+        patterns: ['500kV State Grid', '500kV', 'State Grid', 'Transmission Pylons'],
+        plain: 'A 1.2-Gigawatt AI campus draws as much electricity as 800,000 homes (an entire city). Regular street power lines would vaporize under that load, so the campus taps directly into the regional <strong>500,000-Volt (500kV) steel-pylon transmission superhighway</strong>.'
+      },
+      autotransformer_gis: {
+        title: '350MVA Autotransformer & GIS',
+        expansion: '500kV-to-13.8kV Step-Down Autotransformer & Gas-Insulated Switchgear',
+        patterns: ['350 MVA', 'Autotransformers', 'Autotransformer', 'GIS', 'Main Switchyard'],
+        plain: 'Where the 500kV State Grid lines land on campus, four house-sized <strong>350 MVA Autotransformers</strong> step 500,000 Volts down to 13,800 Volts (13.8kV), routed through sealed <strong>Gas-Insulated Switchgear (GIS)</strong> circuit breakers into underground armored busducts feeding all 4 Data Halls.'
+      },
+      smr_clean_power: {
+        title: 'SMR & 24/7 Carbon-Free Firm Power',
+        expansion: 'Small Modular Reactor / Geothermal Clean Baseload Plant',
+        patterns: ['SMR', 'Clean Firm Power', 'Solar PV'],
+        plain: 'Solar and wind fluctuate with the weather, while a 1.2GW AI data center runs at 100% 24/7. Hyperscale campuses pair rooftop/field <strong>Solar PV</strong> and <strong>2.4 GWh BESS batteries</strong> with co-located <strong>Clean Firm Power (Small Modular Nuclear Reactors / Advanced Geothermal)</strong> tied straight into the campus switchyard.'
+      },
+      tes_silos: {
+        title: 'TES Chilled-Water Buffer Silos',
+        expansion: 'Stratified Thermal Energy Storage (2 Million Gallon Chilled-Water Tanks)',
+        patterns: ['TES', 'Thermal Energy Storage', 'Water Silos'],
+        plain: 'Those four 11-meter-tall silver cylinders between the buildings are giant insulated Thermos bottles (<strong>TES Tanks</strong>). They store <strong>2 million gallons of 16°C chilled water</strong> so if a power blip or desert heatwave hits, cold water keeps flowing through the AI chips without interruption.'
+      },
+      dark_fiber_pop: {
+        title: 'Dark-Fiber PoP Meet-Me Vaults',
+        expansion: 'Point-of-Presence Long-Haul Interstate & Subsea Fiber Gateway',
+        patterns: ['Dark-Fiber', 'PoP', 'Meet-Me Vaults', 'Skybridges', 'Skybridge'],
+        plain: '<strong>Dark Fiber</strong> means private glass fiber-optic cables dedicated 100% to Google’s laser equipment. Dual underground <strong>Meet-Me Vaults (PoPs)</strong> at the south edge of campus bring in 400+ Terabits/sec from interstate highways & subsea cables, while elevated <strong>Skybridges</strong> link all 4 buildings into one supercomputer.'
+      },
+      centrifugal_chiller: {
+        title: '3,000-Ton Mag-Bearing Chiller ($1.5M)',
+        expansion: 'Trane CenTraVac / York YZ Magnetic-Levitation Centrifugal Water Chiller',
+        patterns: ['Centrifugal Water Chillers', 'Centrifugal Chiller', 'Mag-Bearing Chiller'],
+        plain: 'Cooling towers alone cannot make 16°C (61°F) water when it is 100°F outside. These <strong>$1.5M twin-barrel Centrifugal Chillers</strong> use a frictionless <strong>magnetic-levitation compressor</strong> spinning at 15,000 RPM to refrigerate the campus chilled-water loop on hot summer days.'
+      },
+      standby_genset: {
+        title: '3.5MW V20 HVO Generator ($2.2M)',
+        expansion: 'Caterpillar 3516E / MTU 20V4000 Standby Turbine/Diesel Generator Skid',
+        patterns: ['3.5MW Standby Generators', 'Standby Generator', 'HVO'],
+        plain: 'Batteries last 1–2 hours, so for multi-day grid blackouts, rows of <strong>$2.2M 20-cylinder (3.5 Megawatt) Standby Generators</strong> burning renewable <strong>HVO (Hydrotreated Vegetable Oil)</strong> sit in soundproof containers ready to auto-start and take over the load in under 10 seconds.'
+      },
+      nvme_checkpoint: {
+        title: 'Petabyte NVMe-oF Storage ($1.2M/Rack)',
+        expansion: 'All-Flash NVMe-over-Fabrics AI Checkpoint Storage (VAST / WEKA / Pure)',
+        patterns: ['NVMe-oF', 'Checkpoint Storage', 'E3.S'],
+        plain: 'When 100,000 AI chips train a model for months, one chip fails every few hours. Every 15 minutes, all GPUs/TPUs dump their memory ("<strong>checkpoint</strong>") into these <strong>$1.2M All-Flash NVMe-oF Storage Racks</strong> at 10+ Terabytes/sec so a crash only loses 15 minutes of work instead of weeks!'
+      },
+      spine_switch_51t: {
+        title: '51.2T Spine Switch Rack ($450K/Rack)',
+        expansion: 'NVIDIA Quantum-X800 InfiniBand / Spectrum-X / Broadcom Tomahawk-5',
+        patterns: ['51.2 Tbps', 'Spine Switch', 'Quantum-X800', 'Tomahawk-5'],
+        plain: 'To connect thousands of racks together without traffic jams, dedicated <strong>51.2 Terabit/sec Spine Switch Racks</strong> (worth <strong>$450K+ per rack</strong>) act as the central nervous system of the hall, routing RDMA packets across hundreds of 800G/1.6T fiber cables.'
+      },
+      novec_vesda: {
+        title: 'Novec 1230 & VESDA Fire Skid ($350K)',
+        expansion: '3M Novec 1230 (FK-5-1-12) Clean-Agent Gas & Laser Smoke Detection',
+        patterns: ['Novec 1230', 'VESDA', 'Clean-Agent'],
+        plain: 'Spraying water on a $3 Billion AI hall would ruin every server. <strong>VESDA</strong> uses lasers to sniff microscopic smoke particles before a flame even starts, and red <strong>Novec 1230 Clean-Agent cylinders</strong> flood the room with a dry, non-conductive gas that puts out fires chemically with zero electronics damage!'
+      },
+      orv3_power_shelf: {
+        title: 'ORv3 48V GaN Power Shelf ($120K/Rack)',
+        expansion: 'Open Rack v3 480V-to-48V Silicon-Carbide / GaN Rectifier & BBU Bay',
+        patterns: ['ORv3', 'Rectifier Shelf', 'BBU'],
+        plain: 'Mounted in the middle of every AI rack are <strong>ORv3 Power Shelves & Lithium BBUs (Battery Backup Units)</strong> worth ~$120K per rack. They convert 480V AC into 48V DC onto the solid copper busbar at 98.2% efficiency.'
+      }
+    };
+
+    // Automatically wrap glossary keywords in clickable/hoverable spans
+    function linkGlossaryTerms(htmlText) {
+      let out = htmlText;
+      const allPatterns = [];
+      Object.keys(GLOSSARY).forEach(key => {
+        GLOSSARY[key].patterns.forEach(pat => {
+          allPatterns.push({ key, pat });
+        });
+      });
+      allPatterns.sort((a, b) => b.pat.length - a.pat.length);
+
+      const tokens = [];
+      allPatterns.forEach(({ key, pat }) => {
+        const escaped = pat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(?![^<]*>)\\b(${escaped})`, 'g');
+        out = out.replace(regex, (match) => {
+          const id = tokens.length;
+          tokens.push(`<span class="glossary-term" data-gkey="${key}" onmouseenter="showGlossaryTerm('${key}')" onclick="showGlossaryTerm('${key}')">${match}</span>`);
+          return `@@GLOSS_${id}@@`;
+        });
+      });
+      tokens.forEach((tok, id) => {
+        out = out.replace(`@@GLOSS_${id}@@`, tok);
+      });
+      return out;
+    }
+
+    window.showGlossaryTerm = function(key) {
+      const entry = GLOSSARY[key];
+      if (!entry) return;
+      state.activeGlossKey = key;
+      document.getElementById('glossTermTitle').textContent = entry.title;
+      document.getElementById('glossTermExpansion').textContent = entry.expansion;
+      document.getElementById('glossTermPlain').innerHTML = entry.plain;
+
+      document.querySelectorAll('.glossary-chip').forEach(el => {
+        el.classList.toggle('active', el.dataset.gkey === key);
+      });
+      document.querySelectorAll('.glossary-term').forEach(el => {
+        el.classList.toggle('active-term', el.dataset.gkey === key);
+      });
+    };
+
+    window.togglePlainEnglish = function() {
+      state.plainEnglishMode = !state.plainEnglishMode;
+      const btn = document.getElementById('plainEngBtn');
+      const box = document.getElementById('plainEnglishBox');
+      btn.textContent = state.plainEnglishMode ? '💡 Plain-English: ON' : '💡 Plain-English: OFF';
+      btn.classList.toggle('active', state.plainEnglishMode);
+      box.style.display = state.plainEnglishMode ? 'block' : 'none';
+    };
+
+    // ============================================================================
+    // 19 INTERCONNECTED MUSEUM EXHIBITS (LEVEL 0 CAMPUS & GRID -> LEVEL 4 SILICON)
+    // ============================================================================
+    const EXHIBITS = [
+      // --- LEVEL 0: 1.2GW EXTERIOR AI CAMPUS & STATE GRID INTERCONNECTS ---
+      {
+        id: 'state_grid_500kv',
+        shortLabel: '0A. 500kV State Power Grid & Pylons',
+        badge: 'REGIONAL GRID INTERCONNECT // 500,000-VOLT BULK TRANSMISSION',
+        title: '500kV State Electrical Grid Transmission Corridor & Lattice Pylons',
+        levels: [0],
+        targetZoom: 0,
+        arch: null,
+        trace: 2,
+        camPreset: { targetX: 48.0, targetY: 8.0, targetZ: -12.0, yaw: 0.25, pitch: 0.34, dist: 64.0 },
+        getPos: () => [52.0, 23.5, -5.0],
+        plainAnalogy: 'A 1.2-Gigawatt AI campus uses as much electricity as 800,000 homes (an entire city like San Francisco). Regular street power lines cannot carry that much energy, so the campus taps directly into the State Grid’s 500,000-Volt (500kV) steel-pylon transmission superhighway.',
+        glossaryKeys: ['grid_500kv', 'autotransformer_gis', 'substation_bess', 'busbar_48v'],
+        desc: 'Marching in from the east are <strong>26-meter-tall double-circuit 500kV State Grid steel lattice transmission towers</strong> carrying sagged high-voltage catenary conductors into the campus dead-end takeoff gantry. Follow the glowing amber power path all the way from these 500kV state lines down to the 0.75V transistors inside Building 1!',
+        chain: [
+          '⚡ 1. Regional 500kV State Grid Pylons → Campus Dead-End Steel Gantry (X = +35.5m)',
+          '🔌 2. Four 350 MVA Autotransformers step 500kV → 13.8kV Medium-Voltage Campus Ring Bus',
+          '🏢 3. Underground 13.8kV Busducts enter Building 1–4 Substations → 480V PDU → 48V Rack Busbar → 0.75V Chip VRMs'
+        ],
+        specs: [
+          ['GRID VOLTAGE', '500 kV Double-Circuit AC'],
+          ['CAMPUS CAPACITY', '1.2 Gigawatts (1,200 MW)'],
+          ['CORRIDOR CAPEX', '~$180M HV Grid Intertie'],
+          ['GRID REDUNDANCY', 'Dual N+1 Regional Feeds']
+        ]
+      },
+      {
+        id: 'campus_substation_bess',
+        shortLabel: '0B. 1.2GW Switchyard ($4.5M/XFMR) & BESS',
+        badge: 'GRID STABILIZATION & CLEAN POWER // 500kV → 13.8kV',
+        title: '1.2GW GIS Switchyard, 2.4GWh Megapack BESS & 3.5MW HVO Generators',
+        levels: [0],
+        targetZoom: 0,
+        arch: null,
+        trace: 2,
+        camPreset: { targetX: 25.0, targetY: 4.0, targetZ: -10.0, yaw: 0.42, pitch: 0.38, dist: 48.0 },
+        getPos: () => [28.5, 7.2, -6.5],
+        plainAnalogy: 'When 500,000 AI chips train a frontier model together, they all pause to sync data and then slam back to 100% power in the same millisecond—creating a 300-Megawatt shockwave. The 18 Megapack BESS containers absorb millisecond shocks, while the lineup of $2.2M 3.5MW Standby Generators (X = +16.8m) provides multi-day blackout backup!',
+        glossaryKeys: ['autotransformer_gis', 'standby_genset', 'substation_bess', 'smr_clean_power'],
+        desc: 'In the east switchyard sit <strong>4× 350 MVA Autotransformers ($4.5M each)</strong>, flanked on the south by an <strong>18-container (2.4 GWh) Megapack BESS Yard ($1.5M/unit)</strong>, along the building wall by <strong>3.5MW V20 HVO Standby Generators ($2.2M each)</strong>, and on the north by a <strong>Clean Firm Power / SMR Baseload Dome</strong>.',
+        chain: [
+          '🔋 South Yard (Z = +18m): 2.4 GWh Megapack BESS absorbs & injects 300MW+ in <2 milliseconds during LLM All-Reduce steps',
+          '⛽ East Lineup (X = +16.8m): 3.5MW V20 Standby Generators (Caterpillar/MTU) start in <10s for multi-day grid outage protection',
+          '⚡ Main GIS Switchyard (X = +28.5m): Feeds redundant 13.8kV armored busducts straight through Building 1’s East Wall'
+        ],
+        specs: [
+          ['350MVA XFMRS', '$4.5M Each (ABB/Hitachi)'],
+          ['MEGAPACK BESS', '$1.5M / Container (2.4GWh)'],
+          ['3.5MW GENSETS', '$2.2M Each (Cat/MTU V20)'],
+          ['RAMP RESPONSE', '< 2 ms BESS / < 10s Genset']
+        ]
+      },
+      {
+        id: 'campus_data_halls',
+        shortLabel: '0C. 4× 300MW AI Data Halls & Skybridges',
+        badge: '1.2GW QUAD-CAMPUS ARCHITECTURE // 500,000+ AI CHIPS',
+        title: '4× 300MW Hyperscale AI Data Halls & Inter-Building Optical Skybridges',
+        levels: [0],
+        targetZoom: 0,
+        arch: null,
+        trace: 0,
+        camPreset: { targetX: -18.0, targetY: 3.5, targetZ: -24.0, yaw: 0.30, pitch: 0.42, dist: 68.0 },
+        getPos: () => [0.0, 7.2, -16.5],
+        plainAnalogy: 'No single building can hold half a million liquid-cooled AI chips. Google groups 4 modular 300MW Data Halls around a central cooling spine and links them with enclosed overhead Skybridges packed with laser fiber-optic cables—so all 4 buildings train one giant AI model together! Click "1. AI Hall Interior" or press [R] to lift Building 1’s roof!',
+        glossaryKeys: ['dark_fiber_pop', 'smr_clean_power', 'tpu_v6e', 'mems_ocs'],
+        desc: 'The campus comprises <strong>four 300MW AI Data Halls (Buildings 1–4 = 1.2 GW total IT load)</strong> clad in fluted precast concrete, brushed aluminum intake louver wings, and <strong>rooftop monocrystalline Solar PV arrays</strong>. Elevated <strong>Inter-Building Optical Skybridges</strong> carry ultra-dense single-mode fiber trunks linking all 4 buildings into a single low-latency cluster.',
+        chain: [
+          '🏢 Building 1 (Front-Right, X = 0, Z = -9m): Live Cutaway Hero Hall! Press [R] or click Level 1 to dive inside its racks',
+          '🌉 Elevated Optical Skybridges: Connect Halls 1↔2, 3↔4, 1↔3, and 2↔4 with <250 nanosecond fiber latency',
+          '☀️ Rooftop Solar PV + Sawtooth Skylight Monitors top all 4 Data Halls'
+        ],
+        specs: [
+          ['CAMPUS LAYOUT', '4× 300MW Modular AI Halls'],
+          ['TOTAL SILICON', '524,288 TPU v6e / GB200'],
+          ['INTER-HALL LINK', '4× Optical Fiber Skybridges'],
+          ['CAMPUS CAPEX', '~$18 Billion Total Build']
+        ]
+      },
+      {
+        id: 'campus_cooling_plant',
+        shortLabel: '0D. Mag-Bearing Chillers ($1.5M) & TES Silos',
+        badge: '1.2GW HYDRO THERMAL SPINE // CHILLERS + TES + ADIABATIC',
+        title: '3,000-Ton Mag-Bearing Centrifugal Chillers, Adiabatic Towers & TES Silos',
+        levels: [0],
+        targetZoom: 0,
+        arch: null,
+        trace: 1,
+        camPreset: { targetX: -24.0, targetY: 4.0, targetZ: -20.0, yaw: -0.28, pitch: 0.36, dist: 48.0 },
+        getPos: () => [-24.0, 11.2, -27.5],
+        plainAnalogy: 'Adiabatic fan towers alone cannot make 16°C water when it is 100°F outside. So the Central Hydro Spine combines $1.5M Magnetic-Bearing Centrifugal Water Chillers (twin barrels at Z = -12m), adiabatic cooling towers, and four 11-meter-tall silver Thermos silos (TES Tanks) storing 2 million gallons of chilled water!',
+        glossaryKeys: ['centrifugal_chiller', 'tes_silos', 'adiabatic_pue', 'cdu_exchanger'],
+        desc: 'In the central utility spine (X = -24m) sit <strong>3,000-Ton Magnetic-Bearing Centrifugal Water Chillers (Trane CenTraVac / York YZ, $1.5M each)</strong> alongside <strong>4× Stratified Thermal Energy Storage (TES) Silos ($2.5M each)</strong> and <strong>Adiabatic Hybrid Cooling Towers</strong>. Blue (18°C supply) and red (42°C return) pipe bridges feed straight into Building 1’s CDUs.',
+        chain: [
+          '1. 3,000-Ton Magnetic-Bearing Centrifugal Chillers & Adiabatic Towers chill the primary loop to 16°C',
+          '2. 4× Stratified TES Water Silos store 2,000,000 gallons of chilled water for 30-minute ride-through',
+          '3. Blue 18°C Pipe Bridge enters Building 1’s West Wall → 1.5MW CDU Plate Heat Exchanger → Chip Cold Plates'
+        ],
+        specs: [
+          ['MAG CHILLERS', '$1.5M Each (3,000-Ton)'],
+          ['TES WATER SILOS', '$2.5M Each (2M Gal Total)'],
+          ['WATER SAVINGS', '> 80% vs Evaporative Towers'],
+          ['CAMPUS PUE', '1.058 Annualized PUE']
+        ]
+      },
+      {
+        id: 'campus_fiber_gateway',
+        shortLabel: '0E. Long-Haul Dark-Fiber Gateway (PoP)',
+        badge: 'GLOBAL BACKBONE // 400+ TERABITS/SEC WAN ENTRY',
+        title: 'Geographically Diverse Interstate & Subsea Dark-Fiber Meet-Me Vaults',
+        levels: [0],
+        targetZoom: 0,
+        arch: null,
+        trace: 3,
+        camPreset: { targetX: 0.0, targetY: 2.0, targetZ: 18.0, yaw: 0.15, pitch: 0.35, dist: 38.0 },
+        getPos: () => [-7.5, 5.2, 17.5],
+        plainAnalogy: 'This is where the 1.2GW AI campus plugs into the rest of Planet Earth. Two armored buildings at the south entrance receive underground bundles of glass dark-fiber cables from interstate highways and subsea ocean cables, beaming 400+ Terabits per second straight into the data halls.',
+        glossaryKeys: ['dark_fiber_pop', 'fiber_raceway', 'mems_ocs', 'osfp_16t'],
+        desc: 'At the south perimeter sit twin geographically separated <strong>East & West Long-Haul Dark-Fiber Point-of-Presence (PoP) Gateways</strong> with satellite ground-station radomes. Underground yellow duct banks bring DWDM coherent optical trunks from interstate & transoceanic backbones straight into Building 1’s overhead <strong>Yellow Fiber Raceway</strong> and <strong>Palomar MEMS Optical Circuit Switch</strong>.',
+        chain: [
+          '🌐 1. Interstate & Subsea DWDM Backbone Fibers enter East & West Redundant Meet-Me Vaults (Z = +17.5m)',
+          '⚡ 2. Underground Optical Duct Banks route into Building 1–4 Spine Switches & Overhead Yellow Fiber Raceways',
+          '🔬 3. Palomar MEMS Optical Circuit Switch & Front-Panel OSFP 1.6T Transceivers link every TPU/GPU tray'
+        ],
+        specs: [
+          ['WAN BANDWIDTH', '400+ Tbps Coherent DWDM'],
+          ['DWDM OLT GEAR', '~$1.4M / PoP Shelter'],
+          ['OPTICAL TECH', '800GZR+ / 1.6T Coherent'],
+          ['SATELLITE SYNC', 'Dual PTP Atomic Ground Dish']
+        ]
+      },
+
+      // --- LEVELS 1 TO 4: INTERIOR HALL -> RACK -> TRAY -> SILICON & HBM3e ---
+      {
+        id: 'tpu_rack',
+        shortLabel: '1. Google TPU v6e Rack (~$2.4M/Rack)',
+        badge: 'RACK ARCHITECTURE // 100kW LIQUID COOLED',
+        title: 'Google TPU v6e (Trillium) 48U Superpod Rack + ORv3 48V Power Shelf',
+        levels: [1, 2],
+        targetZoom: 2,
+        arch: 'tpu',
+        trace: 0,
+        getPos: () => [TPU_RACK_X, 1.85, 0.62],
+        plainAnalogy: 'Think of this 48U cabinet as a $2.4M, 100,000-watt apartment tower for 64 AI superchips: a mid-rack ORv3 Power Shelf energizes a solid 48V copper bar in the back, blue/red water manifolds bring cold water to every tray, and laser fibers on top beam data into the MEMS Optical Switch.',
+        glossaryKeys: ['tpu_v6e', 'orv3_power_shelf', 'u_48', 'busbar_48v', 'manifold_18c', 'mems_ocs'],
+        desc: 'Each TPU v6e (Trillium) 48U rack houses <strong>64 custom AI accelerator chips</strong> across 16 liquid-cooled compute trays plus a mid-rack <strong>ORv3 48V GaN/SiC Rectifier Shelf & Lithium BBU ($120K)</strong>. Chilled water manifolds run vertically along the left & right posts while a solid copper 48V busbar runs up the spine.',
+        chain: [
+          '⚡ Power: Mid-Rack ORv3 Rectifier Shelf → Rear 48V Copper Busbar → Blind-Mate Tray Clip → On-Board VRMs',
+          '❄️ Cooling: Left 18°C Blue Manifold → Braided QDC Hose → Copper Cold Plates → Right 42°C Return Manifold',
+          '🌐 Fabric: Front OSFP 1.6T Optics → Yellow Fiber Raceway → Overhead MEMS Optical Circuit Switch ($350K)'
+        ],
+        specs: [
+          ['CHIPS / RACK', '64× TPU v6e (Trillium)'],
+          ['EST. RACK VALUE', '~$2.2M – $2.6M / Rack'],
+          ['ORv3 POWER BAY', '$120K (100kW 48V + BBU)'],
+          ['COOLING TYPE', 'Direct-to-Chip Cold Plate']
+        ]
+      },
+      {
+        id: 'gpu_rack',
+        shortLabel: '2. NVIDIA GB200 NVL72 Rack (~$3.2M/Rack)',
+        badge: 'RACK ARCHITECTURE // 120kW EXASCALE RACK',
+        title: 'NVIDIA GB200 NVL72 ($3.2M Rack: 72 GPUs + 36 CPUs + 9 NVSwitch Trays)',
+        levels: [1, 2],
+        targetZoom: 2,
+        arch: 'gpu',
+        trace: 0,
+        getPos: () => [GPU_RACK_X, 1.85, 0.62],
+        plainAnalogy: 'This single 48U cabinet costs over $3.2 Million! In addition to 18 compute trays (holding 72 Blackwell GPUs + 36 Grace CPUs), the middle of the rack holds 9 dedicated NVLink Switch Trays (~$400K total) wired to 5,000+ rear copper cables so all 72 GPUs act as one mega-GPU.',
+        glossaryKeys: ['nvlink_spine', 'orv3_power_shelf', 'u_48', 'blind_mate', 'hbm3e', 'busbar_48v'],
+        desc: 'The GB200 NVL72 (~<strong>$3.2M per rack</strong>) connects <strong>72 Blackwell B200 GPUs and 36 Grace CPUs</strong> inside a 120kW liquid-cooled 48U cabinet. Nine mid-rack <strong>NVLink Switch Trays (18× NVSwitch ASICs worth ~$400K)</strong> and <strong>5,000+ Blind-Mate copper NVLink5 cables</strong> form a 130 TB/s backplane spine.',
+        chain: [
+          '🧠 Compute: 18× 1U Compute Trays (each ~$140K, holding 2× Grace CPUs + 4× Blackwell GPUs with HBM3e)',
+          '🔗 Spine: 9× Mid-Rack NVLink Switch Trays (~$400K) + Rear Blind-Mate Copper NVLink5 Cartridges (~$120K)',
+          '⚡ Power & Cooling: 8× ORv3 33kW 48V Rectifier/BBU Shelves (~$120K) + Direct-to-Chip Cold Plates'
+        ],
+        specs: [
+          ['COMPLETE RACK', '~$3.0M – $3.5M / Rack'],
+          ['9× NVSWITCH TRAYS', '~$400K (130 TB/s Fabric)'],
+          ['HBM3e CAPACITY', '13.5 TB @ 576 TB/s'],
+          ['THERMAL LOAD', '120 kW Liquid-Cooled']
+        ]
+      },
+      {
+        id: 'nvme_checkpoint_rack',
+        shortLabel: '2B. Petabyte NVMe-oF Storage ($1.2M/Rack)',
+        badge: 'AI CHECKPOINT STORAGE // 10+ TERABYTES/SEC RDMA FLASH',
+        title: 'All-Flash Petabyte NVMe-oF Checkpoint Storage Rack (VAST / WEKA / Pure)',
+        levels: [1, 2],
+        targetZoom: 1,
+        arch: null,
+        trace: 3,
+        camPreset: { targetX: -2.85, targetY: 1.35, targetZ: 0.0, yaw: 0.18, pitch: 0.15, dist: 3.6 },
+        getPos: () => [-2.85, 2.15, 0.58],
+        plainAnalogy: 'When 100,000 AI chips train a frontier model for months, one chip inevitably glitches every few hours. Every 15 minutes, all GPUs/TPUs pause for a few seconds to save ("checkpoint") their multi-terabyte brain state into this $1.2M All-Flash NVMe Storage Rack so a crash never loses more than 15 minutes!',
+        glossaryKeys: ['nvme_checkpoint', 'osfp_16t', 'fiber_raceway'],
+        desc: 'Flanking the TPU rack at X = -2.85m is a <strong>$1.2M Petabyte All-Flash NVMe-over-Fabrics (NVMe-oF) Storage Rack</strong> (VAST Data / WEKA / Pure FlashBlade//Exa architecture) packed with hundreds of <strong>PCIe Gen5 E3.S enterprise SSDs</strong> and 800G RDMA storage switches.',
+        chain: [
+          '💾 1. 16× High-Density 2U All-Flash Enclosures packed with 60TB–122TB E3.S PCIe Gen5 NVMe SSDs',
+          '🌐 2. 800G RoCEv2 / InfiniBand GPUDirect Storage (GDS) bypasses the CPU to stream straight into GPU/TPU HBM3e',
+          '⏱️ 3. Writes multi-terabyte LLM training checkpoints in seconds so cluster utilization stays above 98%'
+        ],
+        specs: [
+          ['RACK CAPEX', '~$1.0M – $1.5M / Rack'],
+          ['FLASH DENSITY', '4.0 – 8.0 Petabytes / Rack'],
+          ['THROUGHPUT', '1.2 TB/s Read/Write / Rack'],
+          ['PROTOCOL', 'NVMe-oF / GPUDirect RDMA']
+        ]
+      },
+      {
+        id: 'spine_switch_rack',
+        shortLabel: '2C. 51.2T Spine Switch Rack ($450K/Rack)',
+        badge: 'SCALE-OUT AI FABRIC // QUANTUM-X800 / TOMAHAWK-5 SPINE',
+        title: '51.2 Tbps Scale-Out AI Network Spine Switch Rack (800G / 1.6T OSFP)',
+        levels: [1, 2],
+        targetZoom: 1,
+        arch: null,
+        trace: 3,
+        camPreset: { targetX: 2.85, targetY: 1.35, targetZ: 0.0, yaw: -0.18, pitch: 0.15, dist: 3.6 },
+        getPos: () => [2.85, 2.15, 0.58],
+        plainAnalogy: 'Copper NVLink cables only reach inside one rack (2 meters). To connect thousands of racks across the building, this $450K Spine Switch Rack acts as the grand central fiber station—packing twelve 51.2-Terabit liquid-cooled network switches that link every rack at the speed of light.',
+        glossaryKeys: ['spine_switch_51t', 'osfp_16t', 'mems_ocs', 'fiber_raceway'],
+        desc: 'Flanking the GB200 rack at X = +2.85m is a <strong>$450K+ Scale-Out AI Network Spine Switch Rack</strong> housing 12 liquid-cooled <strong>51.2 Tbps switch chassis</strong> (NVIDIA Quantum-X800 InfiniBand / Spectrum-X800 / Broadcom Tomahawk-5 ASICs), each sporting 64× 800G/1.6T OSFP optical ports.',
+        chain: [
+          '🔌 1. Compute Tray Front-Panel OSFP 1.6T Transceivers connect via yellow fiber to Leaf/Spine Switch Racks',
+          '🧠 2. Each 51.2 Tbps Switch ASIC (200G SerDes PAM4) routes RoCEv2 / InfiniBand collective All-Reduce traffic',
+          '🔬 3. Trunks rise into the Overhead Yellow Fiber Raceway & Palomar MEMS Optical Circuit Switch ($350K)'
+        ],
+        specs: [
+          ['RACK CAPEX', '~$450K – $750K / Rack'],
+          ['SWITCH ASIC', '51.2 Tbps (Tomahawk5/X800)'],
+          ['PORTS / CHASSIS', '64× 800G or 32× 1.6T OSFP'],
+          ['LATENCY', '< 400 ns Cut-Through']
+        ]
+      },
+      {
+        id: 'novec_vesda_fire',
+        shortLabel: '2D. Novec 1230 & VESDA Fire Skid ($350K)',
+        badge: 'LIFE & ASSET PROTECTION // CLEAN-AGENT GAS SUPPRESSION',
+        title: '3M Novec 1230 (FK-5-1-12) Clean-Agent Gas Bank & VESDA Laser Smoke Skid',
+        levels: [1],
+        targetZoom: 1,
+        arch: null,
+        trace: 1,
+        camPreset: { targetX: -6.8, targetY: 1.2, targetZ: 1.8, yaw: 0.25, pitch: 0.20, dist: 4.2 },
+        getPos: () => [-6.8, 2.05, 1.8],
+        plainAnalogy: 'If a power supply sparks inside a room holding $3 Billion of AI supercomputers, water sprinklers would destroy everything! Instead, VESDA laser pipes continuously sniff the air for microscopic smoke, and these red Novec 1230 cylinders flood the hall with an electrically safe "dry gas" that puts out fire without wetting a single circuit board.',
+        glossaryKeys: ['novec_vesda', 'cdu_exchanger'],
+        desc: 'Mounted at X = -6.8m, Z = +1.8m is the <strong>$350K Clean-Agent Gas Fire Suppression & VESDA Skid</strong>. Six crimson-red high-pressure cylinders store <strong>Novec 1230 (FK-5-1-12) dielectric fire-extinguishing fluid</strong> under nitrogen pressure, triggered by a <strong>VESDA laser aspiration smoke detector</strong>.',
+        chain: [
+          '🔬 1. VESDA Laser Chamber continuously samples air from overhead ceiling pipes, detecting incipient smoke at 0.0005% obscuration',
+          '🚨 2. Shuts down affected rack 48V breaker before open flame can develop',
+          '🧯 3. If heat rises, brass solenoid valves release Novec 1230 gas—absorbing heat chemically with zero water or residue'
+        ],
+        specs: [
+          ['SYSTEM CAPEX', '~$350K / Data Hall Zone'],
+          ['SUPPRESSANT', 'Novec 1230 / FK-5-1-12 Gas'],
+          ['DETECTION', 'VESDA Laser Air-Sampling'],
+          ['DISCHARGE TIME', '< 10 Seconds Safe Flood']
+        ]
+      },
+      {
+        id: 'compute_tray',
+        shortLabel: '3. Pull-Out Tray (4× TPUs/GPUs + 2× Host CPUs)',
+        badge: 'BLADE LEVEL // WHERE THE CHIPS LIVE ON THE BOARD',
+        title: 'Compute Tray Layout: 4× Giant AI Chips (TPUs/GPUs) + 2× Host CPUs',
+        levels: [2, 3],
+        targetZoom: 3,
+        arch: null,
+        trace: 0,
+        getPos: () => {
+          const rx = state.arch === 'gpu' ? GPU_RACK_X : TPU_RACK_X;
+          const slide = state.arch === 'gpu' ? state.gpuTraySlide : state.tpuTraySlide;
+          return [rx + 0.17, HERO_TRAY_Y + 0.05, 0.18 + slide];
+        },
+        plainAnalogy: 'Look at the green circuit board you just pulled out: the 4 large squares on the left & right ARE the 4 TPU (or Blackwell GPU) processors! Three of them still have their copper cooling lids bolted on top; the front-left one has its copper lid lifted off so you can see inside the TPU/GPU. And the 2 silver squares in the middle lane are the Host CPUs!',
+        glossaryKeys: ['tpu_v6e', 'cowos', 'hbm3e', 'braided_qdc', 'blind_mate', 'osfp_16t'],
+        desc: 'Unlike a home gaming PC, data center GPUs and TPUs don’t sit inside plastic fan cards. Each of the <strong>4 large square sockets</strong> on the left and right of this board is <strong>one complete TPU v6e (or Blackwell B200 GPU)</strong>. In the center lane between them sit <strong>2× silver-lidded Host CPUs</strong> that run Linux/PyTorch/JAX and feed commands to the 4 AI chips.',
+        chain: [
+          '🧠 4× Large Square Sockets (Left & Right): Each square = 1 Complete TPU / GPU (3 covered by copper cold plates, 1 opened up)',
+          '🖥️ 2× Silver Squares (Center Lane): Host CPUs (NVIDIA Grace 72-Core ARM / Xeon) + System RAM sticks',
+          '🔌 Front & Rear Edges: 8× Front OSFP 1.6T Fiber Optics + Rear Dripless Braided QDC Hose & 48V Copper Busbar Clip'
+        ],
+        specs: [
+          ['AI CHIPS / TRAY', '4× TPU v6e or 4× B200 GPU'],
+          ['HOST CPUS / TRAY', '2× Silver-Lidded Host CPUs'],
+          ['TRAY POWER', '5.8 – 6.6 kW / Tray'],
+          ['FRONT I/O', '8× OSFP 1.6T Optics']
+        ]
+      },
+      {
+        id: 'host_cpu_pin',
+        shortLabel: '3B. Host CPUs (Grace ARM / Xeon) + RAM',
+        badge: 'THE ORCHESTRATOR BRAIN // GENERAL-PURPOSE CPU',
+        title: 'Center Lane: 2× Host CPUs (Grace 72-Core ARM / Xeon) + System RAM',
+        levels: [3, 4],
+        targetZoom: 3,
+        arch: null,
+        trace: 4,
+        getPos: () => {
+          const rx = state.arch === 'gpu' ? GPU_RACK_X : TPU_RACK_X;
+          const slide = state.arch === 'gpu' ? state.gpuTraySlide : state.tpuTraySlide;
+          return [rx, HERO_TRAY_Y + 0.025, 0.165 + slide];
+        },
+        plainAnalogy: 'Think of the CPU as the "Orchestra Conductor" and the 4 TPUs/GPUs as the "100,000-Violin Orchestra." The CPU runs the operating system (Linux), loads training text/images from storage into RAM, and tells the 4 giant TPU/GPU matrix engines what math to run next.',
+        glossaryKeys: ['cowos', 'hbm3e', 'nvlink_spine', 'tpu_v6e'],
+        desc: 'In the center lane of the tray sit <strong>two brushed-silver Integrated Heat Spreader (IHS) CPUs</strong> flanked by system memory (512GB LPDDR5X on NVIDIA’s 72-core <strong>Grace CPU</strong>, or DDR5 DIMM sticks on Google’s Host CPU). Gold high-speed chip-to-chip traces (900 GB/s NVLink-C2C / PCIe Gen6) wire each CPU directly to the adjacent TPUs/GPUs.',
+        chain: [
+          '1. Host CPU runs Linux, Python, PyTorch / JAX, and data preprocessing pipelines',
+          '2. Gold Chip-to-Chip (C2C / PCIe Gen6) bridges stream tensors from CPU System RAM into the GPU/TPU HBM3e',
+          '3. Once loaded, the 4 TPUs/GPUs take over and execute quadrillions of matrix operations per second'
+        ],
+        specs: [
+          ['CPU ARCHITECTURE', '72-Core Grace ARM / Xeon'],
+          ['SYSTEM MEMORY', '512 GB LPDDR5X / DDR5'],
+          ['CPU↔GPU LINK', '900 GB/s NVLink-C2C / PCIe6'],
+          ['PACKAGE LID', 'Nickel-Plated Copper IHS']
+        ]
+      },
+      {
+        id: 'silicon_die',
+        shortLabel: '4. THE TPU/GPU BRAIN: Compute Die',
+        badge: 'INSIDE AN OPENED TPU/GPU // THE SILICON BRAIN',
+        title: 'The "Compute Die" IS the TPU / GPU Brain (Tensor Cores & MXUs)',
+        levels: [3, 4],
+        targetZoom: 4,
+        arch: null,
+        trace: 4,
+        getPos: () => {
+          const rx = state.arch === 'gpu' ? GPU_RACK_X : TPU_RACK_X;
+          const slide = state.arch === 'gpu' ? state.gpuTraySlide : state.tpuTraySlide;
+          return [rx - 0.17, HERO_TRAY_Y + 0.015, 0.18 + slide];
+        },
+        plainAnalogy: 'When people say "a GPU" or "a TPU", they mean this whole square package—and the glowing rainbow mirror in the center ("Compute Die") IS the actual brain! We removed the copper lid on this front-left chip so you can see the bare silicon brain (Compute Die) in the center, surrounded by its 8 skyscrapers of built-in HBM3e video memory.',
+        glossaryKeys: ['tpu_v6e', 'cowos', 'hbm3e', 'vrm_vpd'],
+        desc: 'Why do you see a <strong>Compute Die</strong> and <strong>8× HBM3e towers</strong> instead of a single block? Because when you take the metal lid off a modern AI TPU or GPU, it is actually a compound super-chip! The <strong>iridescent center silicon ("Compute Die") IS the literal TPU/GPU brain</strong> holding 104–208 billion transistors (Tensor Cores & Matrix Multiply Units), while the 8 little towers hugging its sides are its built-in HBM3e memory—all fused onto one <strong>CoWoS Silicon Interposer</strong>.',
+        chain: [
+          '🧠 CENTER MIRROR ("Compute Die") = The Actual TPU / GPU Brain (Tensor Cores, Matrix Multiply Units & L2 Cache)',
+          '🏢 8× SIDE TOWERS ("HBM3e Stacks") = The TPU / GPU’s On-Package Video Memory (VRAM), 1mm away from the brain',
+          '🔬 SILVER BASE ("CoWoS Silicon Interposer") = The silicon foundation connecting the Brain Die to the 8 HBM3e towers'
+        ],
+        specs: [
+          ['WHAT IT IS', 'The Actual TPU / GPU Brain'],
+          ['TRANSISTORS', '104 – 208 Billion (3nm/4nm)'],
+          ['MATH ENGINES', 'Systolic Tensor / MXU Cores'],
+          ['WHOLE PACKAGE', 'Brain Die + 8× HBM3e + CoWoS']
+        ]
+      },
+      {
+        id: 'hbm3e_stack',
+        shortLabel: '5. HBM3e 12-Hi Memory Stacks',
+        badge: 'MEMORY ANATOMY // 3D STACKED DRAM CUBES',
+        title: '8× HBM3e 12-Hi Memory Stacks (Visible 12-Layer DRAM Strata)',
+        levels: [3, 4],
+        targetZoom: 4,
+        arch: null,
+        trace: 4,
+        getPos: () => {
+          const rx = state.arch === 'gpu' ? GPU_RACK_X : TPU_RACK_X;
+          const slide = state.arch === 'gpu' ? state.gpuTraySlide : state.tpuTraySlide;
+          return [rx - 0.132, HERO_TRAY_Y + 0.014, 0.195 + slide];
+        },
+        plainAnalogy: 'A giant AI brain starves if memory lives inches away on flat RAM sticks. HBM3e builds 8 tiny 12-story skyscrapers of memory ("12-Hi") right next door to the AI die (1 millimeter away), using microscopic vertical elevator shafts (TSVs) to move 8 Terabytes per second.',
+        glossaryKeys: ['hbm3e', 'tsv', 'cowos'],
+        desc: 'Large Language Models are bottlenecked by memory bandwidth. Flanking the left and right edges of the compute die are <strong>8× HBM3e (High Bandwidth Memory) 12-Hi towers</strong>. Each tiny cube vertically stacks <strong>12 thinned DRAM dies</strong> atop a base logic die, pierced by thousands of microscopic <strong>Through-Silicon Vias (TSVs)</strong>.',
+        chain: [
+          '1. 12-Hi Vertically Stacked DRAM Layers bonded via micro-bumps (visible as golden strata on the cube sides)',
+          '2. Pierced by Through-Silicon Vias (TSVs) creating a 1,024-bit wide interface per HBM3e stack',
+          '3. Delivers 4.8 to 8.0 TB/s of memory bandwidth across the CoWoS Silicon Interposer'
+        ],
+        specs: [
+          ['STACK HEIGHT', '12-Hi DRAM + Logic Die'],
+          ['PIN TRANSFER', '9.6 Gbps / Pin'],
+          ['BUS WIDTH', '8,192-bit (8× 1024-bit)'],
+          ['BANDWIDTH', '4.8 – 8.0 TB/s per Chip']
+        ]
+      },
+      {
+        id: 'copper_coldplate',
+        shortLabel: '6. Skived Micro-Fin Copper Cold Plate',
+        badge: 'THERMAL ANATOMY // DIRECT-TO-CHIP LIQUID COOLING',
+        title: 'Machined C11000 Copper Cold Plate (0.2mm Skived Micro-Fins)',
+        levels: [3, 4],
+        targetZoom: 4,
+        arch: null,
+        trace: 1,
+        explodeOnSelect: true,
+        getPos: () => {
+          const rx = state.arch === 'gpu' ? GPU_RACK_X : TPU_RACK_X;
+          const slide = state.arch === 'gpu' ? state.gpuTraySlide : state.tpuTraySlide;
+          return [rx - 0.17, HERO_TRAY_Y + 0.032 + state.coldPlateLift, 0.18 + slide];
+        },
+        plainAnalogy: 'A 1,200-watt chip gets as hot as an electric stove burner in a split second. This copper block clamps straight onto the bare silicon; inside, razor-thin copper fins ("skived micro-fins") let cold 18°C water soak up the heat before the chip can throttle.',
+        glossaryKeys: ['skived_coldplate', 'manifold_18c', 'braided_qdc', 'hbm3e'],
+        desc: 'Press <strong>[E] Explode Chip</strong> to levitate the Cold Plate! Inside the machined copper block are <strong>skived 0.2mm micro-channel copper fins</strong> sitting directly over an Indium thermal interface on the silicon die and HBM3e stacks. Chilled 18°C PG25 coolant flows through the micro-fins, absorbing 1,200W of heat in milliseconds.',
+        chain: [
+          '❄️ 18°C Chilled Coolant enters from the Braided QDC Hose → splits across 0.2mm skived copper micro-channels',
+          '🔥 Absorbs heat from both the Central Compute Dies and all 8× HBM3e Memory Stacks simultaneously',
+          '🌡️ Exits the right barb at ~42°C into the return hose → Rack Return Manifold → CDU'
+        ],
+        specs: [
+          ['FIN PITCH', '0.15 – 0.20 mm Skived Cu'],
+          ['THERMAL TIM', 'Indium / Phase-Change'],
+          ['FLOW RATE', '1.8 – 2.5 L/min per Chip'],
+          ['HEAT FLUX', '> 100 W/cm² Capacity']
+        ]
+      },
+      {
+        id: 'osfp_ocs_optics',
+        shortLabel: '7. OSFP 1.6T Fiber & MEMS Optical Switch',
+        badge: 'OPTICAL NETWORKING // 3D TORUS & PALOMAR OCS',
+        title: 'OSFP 1.6T Silicon Photonics & MEMS Optical Circuit Switch (OCS)',
+        levels: [1, 2, 3],
+        targetZoom: 3,
+        arch: null,
+        trace: 3,
+        getPos: () => {
+          if (state.zoomLevel === 1) return [0.0, 3.15, 0.55];
+          const rx = state.arch === 'gpu' ? GPU_RACK_X : TPU_RACK_X;
+          const slide = state.arch === 'gpu' ? state.gpuTraySlide : state.tpuTraySlide;
+          return [rx - 0.10, HERO_TRAY_Y + 0.025, 0.48 + slide];
+        },
+        plainAnalogy: 'Electricity slows down over long wires, so plug-in laser modules (OSFP 1.6T) turn chip data into beams of light inside glass fibers. Those fibers ride in a yellow overhead trough (Fiber Raceway) into a box of tilting microscopic gold mirrors (MEMS OCS) that bounce light from rack to rack!',
+        glossaryKeys: ['osfp_16t', 'fiber_raceway', 'mems_ocs'],
+        desc: 'Copper cables attenuate rapidly beyond 2 meters. At the front of every compute tray sit <strong>8× OSFP 1.6T Silicon Photonics transceivers</strong> converting electrical SerDes lanes into laser pulses over yellow single-mode fiber. Overhead, Google’s <strong>Palomar MEMS Optical Circuit Switch</strong> bounces laser beams off 2D gold micro-mirror arrays to dynamically reconfigure the 3D Torus topology!',
+        chain: [
+          '1. Chip SerDes (224G PAM4) → Low-loss PCB traces → Front-panel OSFP 1.6T Laser Transceiver',
+          '2. Yellow Single-Mode Fiber Patch Cord → Overhead Yellow Fiber Raceway',
+          '3. Palomar MEMS Optical Circuit Switch (136×136 gold micro-mirrors) routes light between any two racks'
+        ],
+        specs: [
+          ['TRANSCEIVER', 'OSFP-XD 800G / 1.6T DR8'],
+          ['MODULATION', '8× 200G PAM4 Silicon Phot.'],
+          ['OCS SWITCHING', '2D Gold MEMS Mirror Array'],
+          ['OCS INSERTION', '< 2.0 dB All-Optical Loss']
+        ]
+      },
+      {
+        id: 'busbar_48v_vrm',
+        shortLabel: '8. 48V Copper Busbar & VRM Power Delivery',
+        badge: 'ELECTRICAL ANATOMY // 48V DC → 0.75V @ 1,200A',
+        title: 'Rear 48V Solid Copper Busbar & Multiphase VRM Power Stages',
+        levels: [2, 3, 4],
+        targetZoom: 3,
+        arch: null,
+        trace: 2,
+        getPos: () => {
+          const rx = state.arch === 'gpu' ? GPU_RACK_X : TPU_RACK_X;
+          const slide = state.arch === 'gpu' ? state.gpuTraySlide : state.tpuTraySlide;
+          return [rx, HERO_TRAY_Y + 0.04, -0.42 + slide];
+        },
+        plainAnalogy: 'Sending 100,000 watts through thin 12-volt wires would melt them. Instead, a thick 48-volt copper bar runs up the back of the rack (cutting wasted heat by 16×), and tiny power converters (VRMs) right next to the chip step 48V down to 0.75V at the last inch.',
+        glossaryKeys: ['busbar_48v', 'vrm_vpd', 'blind_mate'],
+        desc: 'Delivering 100 kW at 12V would require 8,300 Amps and massive copper losses ($I^2R$). Instead, hyperscale AI racks use a <strong>48V DC solid copper vertical busbar</strong> at the back of the cabinet (16× lower resistive loss). When a tray slides in, its Blind-Mate rear gold clip draws 48V into on-board <strong>multiphase coupled-inductor VRMs</strong> right next to the chip socket.',
+        chain: [
+          '⚡ Mid-Rack 48V Rectifier Shelf energizes the vertical 48V Copper Busbar running up the rack spine',
+          '🔌 Blind-Mate Gold Finger Clip at the rear of the compute tray mates automatically on insertion',
+          '🔋 On-board 48V Input Capacitors & Multiphase VRMs step 48V → 0.75V millimeters from the silicon die'
+        ],
+        specs: [
+          ['BUSBAR VOLTAGE', '48V – 54V DC Regulated'],
+          ['RACK CURRENT', '~2,200 Amps Total'],
+          ['I²R LOSS SAVED', '16× Lower vs 12V Bus'],
+          ['DIE VRM OUTPUT', '0.72V @ 1,200A / Socket']
+        ]
+      },
+      {
+        id: 'cdu_cooling_loop',
+        shortLabel: '9. 1.5MW CDU & Adiabatic Cooling Tower',
+        badge: 'THERMAL FACILITY // TWO-LOOP HYDRO ARCHITECTURE',
+        title: '1.5MW Coolant Distribution Unit (CDU) & Adiabatic Tower Loop',
+        levels: [1],
+        targetZoom: 1,
+        arch: null,
+        trace: 1,
+        camPreset: { targetX: -5.8, targetY: 1.5, targetZ: -0.2, yaw: 0.15, pitch: 0.18, dist: 6.2 },
+        getPos: () => [-4.6, 2.35, 0.55],
+        plainAnalogy: 'You never want outdoor cooling-tower water touching microscopic 0.2mm copper channels inside a $3M server rack. The CDU acts as a sterile heart-lung machine: it circulates surgical-grade water inside the racks and hands the heat off across metal plates to the outdoor cooling tower loop.',
+        glossaryKeys: ['cdu_exchanger', 'adiabatic_pue', 'manifold_18c', 'skived_coldplate'],
+        desc: 'The water flowing through the micro-fin Cold Plates inside the servers never mixes with outdoor cooling tower water. The <strong>Coolant Distribution Unit (CDU)</strong> uses a <strong>brazed stainless-steel Plate Heat Exchanger</strong> and dual redundant VFD pumps to isolate the ultra-pure rack loop from the exterior <strong>Adiabatic Hybrid Cooling Tower</strong> loop, achieving a 1.06 PUE.',
+        chain: [
+          '1. Secondary Rack Loop: CDU pumps 18°C PG25 fluid overhead into Rack 18°C Blue Manifold → Chip Cold Plates',
+          '2. Heat Exchange: 42°C red return fluid enters the CDU Brazed Plate Heat Exchanger core',
+          '3. Primary Tower Loop: Rejects 1.5 MW of heat to the Exterior Adiabatic Hybrid Cooling Tower & Central TES Silos'
+        ],
+        specs: [
+          ['CDU CAPACITY', '1,500 kW Thermal Rejection'],
+          ['PUMP TOPOLOGY', 'Dual Redundant N+1 VFD'],
+          ['FILTRATION', '5-Micron + Deionization'],
+          ['FACILITY PUE', '1.06 Annualized PUE']
+        ]
+      },
+      {
+        id: 'substation_power',
+        shortLabel: '10. 13.8kV Transformer, BESS & 480V PDU',
+        badge: 'ELECTRICAL FACILITY // UTILITY GRID TO RACK',
+        title: '13.8kV Medium-Voltage Substation Transformer & BESS UPS',
+        levels: [1],
+        targetZoom: 1,
+        arch: null,
+        trace: 2,
+        camPreset: { targetX: 6.4, targetY: 1.6, targetZ: -0.2, yaw: -0.18, pitch: 0.18, dist: 6.4 },
+        getPos: () => [8.4, 2.85, 0.45],
+        plainAnalogy: 'This is the electrical step-down staircase from the 500kV State Grid to the transistor: 500kV State Grid → 13,800 Volts (13.8kV) from the campus switchyard → big copper transformers step it down to 480V → rack shelves convert it to 48V DC on the copper busbar → chip VRMs drop it to 0.75V!',
+        glossaryKeys: ['substation_bess', 'grid_500kv', 'busbar_48v', 'vrm_vpd'],
+        desc: 'Tracing the electricity from the 500kV Main Switchyard through Building 1’s East Wall: this <strong>13.8kV 3-Phase Cast-Coil Dry Transformer</strong> steps 13.8kV AC down to <strong>480V 3-Phase AC</strong>, backed by the campus 2.4GWh BESS units. From the 480V PDU skid, overhead busways feed the 48V DC rectifiers in every rack.',
+        chain: [
+          '1. 500kV State Grid → Campus Switchyard → 13.8kV Medium-Voltage 3-Phase Transformer (Phases A, B, C)',
+          '2. Grid Stabilization: 2.4GWh BESS Battery Yard buffers sudden 300MW+ LLM synchronous all-reduce power steps',
+          '3. 480V AC Armored Busduct → Rack 48V DC Rectifier Shelf → 48V Copper Busbar → 0.75V Chip VRM'
+        ],
+        specs: [
+          ['PRIMARY INPUT', '13.8 kV (From 500kV Yard)'],
+          ['SECONDARY BUS', '480V AC Armored Busduct'],
+          ['RECTIFIER EFF.', '98.2% (480V AC → 48V DC)'],
+          ['UPS RIDE-THROUGH', '2.4GWh BESS + Flywheel']
+        ]
+      }
+    ];
+
+    function findExhibitIdx(id) {
+      const idx = EXHIBITS.findIndex(e => e.id === id);
+      return idx >= 0 ? idx : 0;
+    }
+
+    // Create DOM Elements for the 3D Callout Pins
+    const pinsContainer = document.getElementById('pinsContainer');
+    const pinEls = {};
+    EXHIBITS.forEach((ex, idx) => {
+      const el = document.createElement('div');
+      el.className = 'pin-3d';
+      el.innerHTML = `
+        <div class="flex flex-col items-center">
+          <div class="pin-card px-2.5 py-1 rounded text-xs font-mono-tech text-white whitespace-nowrap flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+            <span class="font-semibold">${ex.shortLabel}</span>
+          </div>
+          <div class="w-px h-3.5 bg-sky-400/80"></div>
+          <div class="w-2 h-2 rounded-full bg-sky-400 ring-4 ring-sky-400/25"></div>
+        </div>
+      `;
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activateExhibit(idx);
+      });
+      pinsContainer.appendChild(el);
+      pinEls[ex.id] = el;
+    });
+
+    // ============================================================================
+    // CAMERA ZOOM LEVELS (0..4), ROOF CUTAWAY & UI SYNCHRONIZATION
+    // ============================================================================
+    function syncRoofBtn() {
+      const btn = document.getElementById('roofBtn');
+      const isCutaway = state.roofCutaway || state.zoomLevel >= 1;
+      btn.textContent = isCutaway ? '[R] Roof Cutaway: ON' : '[R] Roof Cutaway: OFF';
+      btn.classList.toggle('active', isCutaway);
+    }
+
+    window.toggleBuildingRoof = function() {
+      if (state.zoomLevel >= 1) {
+        // If inside the building, jumping to Level 0 with Roof ON lets you see the roof close back over the building!
+        state.roofCutaway = false;
+        setZoomLevel(0);
+      } else {
+        state.roofCutaway = !state.roofCutaway;
+        syncRoofBtn();
+      }
+    };
+
+    function updateCameraTargetsForZoom(level) {
+      const rx = state.arch === 'gpu' ? GPU_RACK_X : TPU_RACK_X;
+      if (level === 0) {
+        // Level 0: 1.2GW Exterior AI Campus & 500kV State Grid Overview
+        state.cam.targetX = 6.0;
+        state.cam.targetY = 2.0;
+        state.cam.targetZ = -12.0;
+        state.cam.yaw = 0.34;
+        state.cam.pitch = 0.42;
+        state.cam.dist = 76.0;
+        document.getElementById('scaleReadout').textContent = 'SCALE: 1.5km (1.2GW CAMPUS & 500kV STATE GRID)';
+      } else if (level === 1) {
+        // Level 1: Inside Building 1 AI Hall Overview
+        state.cam.targetX = 0.0;
+        state.cam.targetY = 1.55;
+        state.cam.targetZ = -0.1;
+        state.cam.yaw = 0.0;
+        state.cam.pitch = 0.16;
+        state.cam.dist = 7.6;
+        document.getElementById('scaleReadout').textContent = 'SCALE: 30m (BUILDING 1 // AI HALL INTERIOR)';
+      } else if (level === 2) {
+        // Level 2: Open Rack Door & Vertical Manifolds / Busbar View
+        state.cam.targetX = rx;
+        state.cam.targetY = 1.32;
+        state.cam.targetZ = 0.15;
+        state.cam.yaw = state.arch === 'gpu' ? -0.22 : 0.22;
+        state.cam.pitch = 0.14;
+        state.cam.dist = 2.35;
+        document.getElementById('scaleReadout').textContent = `SCALE: 2.0m (${state.arch === 'gpu' ? 'GB200 NVL72' : 'TPU v6e'} OPEN RACK)`;
+      } else if (level === 3) {
+        // Level 3: Pulled-Out Compute Tray Cutaway View
+        state.cam.targetX = rx;
+        state.cam.targetY = HERO_TRAY_Y + 0.02;
+        state.cam.targetZ = 0.72;
+        state.cam.yaw = 0.34;
+        state.cam.pitch = 0.52;
+        state.cam.dist = 0.92;
+        document.getElementById('scaleReadout').textContent = 'SCALE: 0.5m (PULL-OUT COMPUTE TRAY)';
+      } else if (level === 4) {
+        // Level 4: Millimeter-Scale Silicon Die, 12-Hi HBM3e Stacks & Levitating Copper Cold Plate!
+        state.cam.targetX = rx - 0.17;
+        state.cam.targetY = HERO_TRAY_Y + 0.015;
+        state.cam.targetZ = 0.18 + 0.72;
+        state.cam.yaw = 0.38;
+        state.cam.pitch = 0.48;
+        state.cam.dist = 0.24;
+        document.getElementById('scaleReadout').textContent = 'SCALE: 80mm (SILICON DIE, HBM3e & COLD PLATE)';
+      }
+
+      for (let i = 0; i <= 4; i++) {
+        const b = document.getElementById('zoomBtn' + i);
+        if (b) b.classList.toggle('active', i === level);
+      }
+      syncRoofBtn();
+      document.getElementById('placardActionBtn').textContent = (level < 4) ? `Zoom to Level ${level + 1} →` : 'Reset to 1.2GW Campus ↺';
+    }
+
+    window.setZoomLevel = function(level) {
+      state.zoomLevel = level;
+      if (level === 4 && !state.explodeColdPlate) {
+        state.explodeColdPlate = true;
+        syncExplodeBtn();
+      }
+      updateCameraTargetsForZoom(level);
+
+      const defaultExhibitIds = {
+        0: 'state_grid_500kv',
+        1: state.arch === 'gpu' ? 'gpu_rack' : 'tpu_rack',
+        2: state.arch === 'gpu' ? 'gpu_rack' : 'tpu_rack',
+        3: 'compute_tray',
+        4: 'silicon_die'
+      };
+      const exIdx = findExhibitIdx(defaultExhibitIds[level]);
+      populatePlacard(EXHIBITS[exIdx], exIdx);
+    };
+
+    window.selectArchitecture = function(archKey) {
+      state.arch = archKey;
+      document.getElementById('archTpuBtn').classList.toggle('active', archKey === 'tpu');
+      document.getElementById('archGpuBtn').classList.toggle('active', archKey === 'gpu');
+      document.getElementById('btn2Label').textContent = archKey === 'gpu' ? 'Open GB200 Rack' : 'Open TPU v6e Rack';
+      if (state.zoomLevel === 0) {
+        // If user clicks TPU or GB200 Rack button while at Campus Level 0, zoom into Level 2 Open Rack!
+        setZoomLevel(2);
+      } else {
+        updateCameraTargetsForZoom(state.zoomLevel);
+        if (state.zoomLevel <= 2) {
+          const exIdx = findExhibitIdx(archKey === 'gpu' ? 'gpu_rack' : 'tpu_rack');
+          populatePlacard(EXHIBITS[exIdx], exIdx);
+        }
+      }
+    };
+
+    function syncExplodeBtn() {
+      const btn = document.getElementById('explodeBtn');
+      btn.textContent = state.explodeColdPlate ? '[E] Explode Chip: ON' : '[E] Explode Chip: OFF';
+      btn.classList.toggle('active', state.explodeColdPlate);
+    }
+
+    window.toggleExplodeColdPlate = function() {
+      state.explodeColdPlate = !state.explodeColdPlate;
+      syncExplodeBtn();
+      if (state.explodeColdPlate && state.zoomLevel < 3) {
+        setZoomLevel(4);
+        const exIdx = findExhibitIdx('copper_coldplate');
+        populatePlacard(EXHIBITS[exIdx], exIdx);
+      }
+    };
+
+    window.setSubsystemTrace = function(mode) {
+      state.traceMode = mode;
+      const classes = ['active-all', 'active-cooling', 'active-power', 'active-optical', 'active-silicon'];
+      for (let i = 0; i < 5; i++) {
+        const b = document.getElementById('traceBtn' + i);
+        b.className = 'trace-pill px-2.5 py-1.5 rounded flex items-center gap-1.5 ' + (i === mode ? classes[i] : '');
+      }
+    };
+
+    function populatePlacard(ex, idx) {
+      state.tourIndex = idx;
+      state.selectedPinId = ex.id;
+      document.getElementById('placardCategory').textContent = `EXHIBIT ${idx + 1} OF ${EXHIBITS.length} // ${ex.badge}`;
+      document.getElementById('placardTitle').textContent = ex.title;
+      document.getElementById('plainEnglishText').textContent = ex.plainAnalogy || '';
+      document.getElementById('placardDesc').innerHTML = linkGlossaryTerms(ex.desc);
+      document.getElementById('placardChain').innerHTML = ex.chain.map(c => `<div>${linkGlossaryTerms(c)}</div>`).join('');
+      document.getElementById('placardSpecs').innerHTML = ex.specs.map(([k, v]) => `
+        <div class="bg-white/[0.03] p-2 rounded border border-white/5">
+          <div class="text-slate-400">${k}</div>
+          <div class="text-white font-semibold mt-0.5">${v}</div>
+        </div>
+      `).join('');
+
+      const chipsBar = document.getElementById('glossaryChipsBar');
+      const gKeys = ex.glossaryKeys || ['grid_500kv', 'tpu_v6e', 'busbar_48v'];
+      chipsBar.innerHTML = gKeys.map(k => {
+        const g = GLOSSARY[k];
+        return g ? `<button class="glossary-chip px-2 py-0.5 rounded text-xs font-mono-tech" data-gkey="${k}" onmouseenter="showGlossaryTerm('${k}')" onclick="showGlossaryTerm('${k}')">${g.title}</button>` : '';
+      }).join('');
+
+      if (gKeys.length > 0) {
+        showGlossaryTerm(gKeys[0]);
+      }
+
+      Object.keys(pinEls).forEach(id => {
+        pinEls[id].classList.toggle('selected', id === ex.id);
+      });
+    }
+
+    window.activateExhibit = function(idx) {
+      const ex = EXHIBITS[idx];
+      if (!ex) return;
+      if (ex.arch && ex.arch !== state.arch) {
+        state.arch = ex.arch;
+        document.getElementById('archTpuBtn').classList.toggle('active', ex.arch === 'tpu');
+        document.getElementById('archGpuBtn').classList.toggle('active', ex.arch === 'gpu');
+        document.getElementById('btn2Label').textContent = ex.arch === 'gpu' ? 'Open GB200 Rack' : 'Open TPU v6e Rack';
+      }
+      if (ex.explodeOnSelect) {
+        state.explodeColdPlate = true;
+        syncExplodeBtn();
+      }
+      state.zoomLevel = ex.targetZoom;
+      updateCameraTargetsForZoom(ex.targetZoom);
+
+      if (ex.camPreset) {
+        Object.assign(state.cam, ex.camPreset);
+      } else {
+        const p = ex.getPos();
+        if (ex.targetZoom >= 3) {
+          state.cam.targetX = p[0];
+          state.cam.targetY = p[1];
+          state.cam.targetZ = (ex.targetZoom >= 3) ? (ex.id === 'busbar_48v_vrm' ? -0.42 + 0.72 : (ex.targetZoom === 4 ? 0.18 + 0.72 : 0.72)) : p[2];
+          if (ex.id === 'busbar_48v_vrm') {
+            state.cam.yaw = 0.85;
+          }
+        }
+      }
+      setSubsystemTrace(ex.trace);
+      populatePlacard(ex, idx);
+    };
+
+    window.stepTour = function(delta) {
+      const nextIdx = (state.tourIndex + delta + EXHIBITS.length) % EXHIBITS.length;
+      activateExhibit(nextIdx);
+    };
+
+    window.advanceZoomOrTour = function() {
+      if (state.zoomLevel < 4) {
+        setZoomLevel(state.zoomLevel + 1);
+      } else {
+        setZoomLevel(0);
+      }
+    };
+
+    window.togglePlacard = function() {
+      state.placardVisible = !state.placardVisible;
+      const body = document.getElementById('placardBody');
+      const btn = document.getElementById('placardToggleBtn');
+      body.style.display = state.placardVisible ? 'block' : 'none';
+      btn.textContent = state.placardVisible ? 'Hide' : 'Show Guide';
+    };
+
+    // ============================================================================
+    // MATRIX MATH & 3D-TO-2D SCREEN PROJECTION FOR CALLOUT PINS
+    // ============================================================================
+    function mat4Identity() {
+      return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+    }
+
+    function mat4Translate(tx, ty, tz) {
+      return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, tx,ty,tz,1]);
+    }
+
+    function mat4TranslateRotateY(tx, ty, tz, angleRad) {
+      const c = Math.cos(angleRad), s = Math.sin(angleRad);
+      return new Float32Array([
+        c, 0, -s, 0,
+        0, 1,  0, 0,
+        s, 0,  c, 0,
+        tx, ty, tz, 1
+      ]);
+    }
+
+    function mat4Perspective(fovRad, aspect, near, far) {
+      const f = 1.0 / Math.tan(fovRad * 0.5);
+      const nf = 1.0 / (near - far);
+      return new Float32Array([
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (far + near) * nf, -1,
+        0, 0, (2 * far * near) * nf, 0
+      ]);
+    }
+
+    function mat4LookAt(ex, ey, ez, cx, cy, cz) {
+      let zx = ex - cx, zy = ey - cy, zz = ez - cz;
+      let len = Math.hypot(zx, zy, zz) || 1;
+      zx /= len; zy /= len; zz /= len;
+      let xx = zz, xy = 0, xz = -zx;
+      len = Math.hypot(xx, xy, xz) || 1;
+      xx /= len; xy /= len; xz /= len;
+      const yx = zy * xz - zz * xy;
+      const yy = zz * xx - zx * xz;
+      const yz = zx * xy - zy * xx;
+      return new Float32Array([
+        xx, yx, zx, 0,
+        xy, yy, zy, 0,
+        xz, yz, zz, 0,
+        -(xx * ex + xy * ey + xz * ez),
+        -(yx * ex + yy * ey + yz * ez),
+        -(zx * ex + zy * ey + zz * ez),
+        1
+      ]);
+    }
+
+    function mat4Mul(a, b) {
+      const out = new Float32Array(16);
+      for (let i = 0; i < 4; i++) {
+        for (let j = 0; j < 4; j++) {
+          out[j * 4 + i] =
+            a[0 * 4 + i] * b[j * 4 + 0] +
+            a[1 * 4 + i] * b[j * 4 + 1] +
+            a[2 * 4 + i] * b[j * 4 + 2] +
+            a[3 * 4 + i] * b[j * 4 + 3];
+        }
+      }
+      return out;
+    }
+
+    function project3DToScreen(wx, wy, wz, vp) {
+      const x = vp[0]*wx + vp[4]*wy + vp[8]*wz + vp[12];
+      const y = vp[1]*wx + vp[5]*wy + vp[9]*wz + vp[13];
+      const w = vp[3]*wx + vp[7]*wy + vp[11]*wz + vp[15];
+      if (w <= 0.05) return null;
+      return {
+        x: ((x / w) * 0.5 + 0.5) * window.innerWidth,
+        y: (1.0 - ((y / w) * 0.5 + 0.5)) * window.innerHeight
+      };
+    }
+
+    // ============================================================================
+    // MOUSE ORBIT, SCROLL MULTI-SCALE ZOOM (0..4), DIRECT 3D CLICK & KEYBOARD
+    // ============================================================================
+    canvas.addEventListener('mousedown', (e) => {
+      state.dragging = true;
+      state.dragMoved = false;
+      state.lastX = e.clientX;
+      state.lastY = e.clientY;
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (state.dragging && !state.dragMoved && e.target === canvas) {
+        handleCanvasClick(e.clientX, e.clientY);
+      }
+      state.dragging = false;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!state.dragging) return;
+      const dx = e.clientX - state.lastX;
+      const dy = e.clientY - state.lastY;
+      if (Math.hypot(dx, dy) > 3) state.dragMoved = true;
+      state.lastX = e.clientX;
+      state.lastY = e.clientY;
+
+      state.cam.yaw -= dx * 0.0055;
+      state.cam.pitch = Math.max(-0.15, Math.min(1.38, state.cam.pitch + dy * 0.0055));
+    });
+
+    function syncZoomLevelFromDist() {
+      if (state.cam.dist < 0.36 && state.zoomLevel !== 4) {
+        setZoomLevel(4);
+      } else if (state.cam.dist >= 0.36 && state.cam.dist < 1.35 && state.zoomLevel !== 3) {
+        state.zoomLevel = 3;
+        for (let i = 0; i <= 4; i++) document.getElementById('zoomBtn' + i).classList.toggle('active', i === 3);
+        syncRoofBtn();
+        document.getElementById('scaleReadout').textContent = 'SCALE: 0.5m (PULL-OUT COMPUTE TRAY)';
+      } else if (state.cam.dist >= 1.35 && state.cam.dist < 3.8 && state.zoomLevel !== 2) {
+        state.zoomLevel = 2;
+        for (let i = 0; i <= 4; i++) document.getElementById('zoomBtn' + i).classList.toggle('active', i === 2);
+        syncRoofBtn();
+        document.getElementById('scaleReadout').textContent = 'SCALE: 2.0m (OPEN RACK INTERIOR)';
+      } else if (state.cam.dist >= 3.8 && state.cam.dist < 18.0 && state.zoomLevel !== 1) {
+        state.zoomLevel = 1;
+        for (let i = 0; i <= 4; i++) document.getElementById('zoomBtn' + i).classList.toggle('active', i === 1);
+        syncRoofBtn();
+        document.getElementById('scaleReadout').textContent = 'SCALE: 30m (BUILDING 1 // AI HALL INTERIOR)';
+      } else if (state.cam.dist >= 18.0 && state.zoomLevel !== 0) {
+        state.zoomLevel = 0;
+        for (let i = 0; i <= 4; i++) document.getElementById('zoomBtn' + i).classList.toggle('active', i === 0);
+        syncRoofBtn();
+        document.getElementById('scaleReadout').textContent = 'SCALE: 1.5km (1.2GW CAMPUS & 500kV STATE GRID)';
+      }
+    }
+
+    // Smooth Scroll Wheel Multi-Scale Zoom (Automatically transitions Levels 0 <-> 1 <-> 2 <-> 3 <-> 4!)
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1.13 : 0.885;
+      state.cam.dist = Math.max(0.14, Math.min(135.0, state.cam.dist * factor));
+      syncZoomLevelFromDist();
+    }, { passive: false });
+
+    // Mobile Touchscreen Support: 1-Finger 360° Orbit, 2-Finger Pinch-to-Zoom & Tap-to-Inspect
+    let touchPinchDist = 0;
+    let touchStartX = 0, touchStartY = 0;
+    let touchMoved = false;
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        touchStartX = state.lastX = e.touches[0].clientX;
+        touchStartY = state.lastY = e.touches[0].clientY;
+        touchMoved = false;
+      } else if (e.touches.length === 2) {
+        touchMoved = true;
+        touchPinchDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+      }
+    }, { passive: true });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        const tx = e.touches[0].clientX;
+        const ty = e.touches[0].clientY;
+        const dx = tx - state.lastX;
+        const dy = ty - state.lastY;
+        if (Math.hypot(tx - touchStartX, ty - touchStartY) > 8) touchMoved = true;
+        state.lastX = tx;
+        state.lastY = ty;
+        state.cam.yaw -= dx * 0.0065;
+        state.cam.pitch = Math.max(-0.15, Math.min(1.38, state.cam.pitch + dy * 0.0065));
+      } else if (e.touches.length === 2) {
+        touchMoved = true;
+        const newDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        if (touchPinchDist > 10 && newDist > 10) {
+          const ratio = touchPinchDist / newDist;
+          state.cam.dist = Math.max(0.14, Math.min(135.0, state.cam.dist * ratio));
+          syncZoomLevelFromDist();
+        }
+        touchPinchDist = newDist;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (!touchMoved && e.changedTouches.length === 1) {
+        handleCanvasClick(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      }
+    }, { passive: true });
+
+    let lastViewProj = mat4Identity();
+
+    function handleCanvasClick(mx, my) {
+      let bestIdx = -1;
+      let bestScreenDist = 110;
+      EXHIBITS.forEach((ex, idx) => {
+        if (!ex.levels.includes(state.zoomLevel)) return;
+        const p = ex.getPos();
+        const scr = project3DToScreen(p[0], p[1], p[2], lastViewProj);
+        if (scr) {
+          const d = Math.hypot(scr.x - mx, scr.y - my);
+          if (d < bestScreenDist) {
+            bestScreenDist = d;
+            bestIdx = idx;
+          }
+        }
+      });
+
+      if (bestIdx !== -1) {
+        activateExhibit(bestIdx);
+      } else if (state.zoomLevel < 4) {
+        setZoomLevel(state.zoomLevel + 1);
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      state.keys[k] = true;
+      if (k === '0') setZoomLevel(0);
+      if (k === '1') setZoomLevel(1);
+      if (k === '2') setZoomLevel(2);
+      if (k === '3') setZoomLevel(3);
+      if (k === '4') setZoomLevel(4);
+      if (k === 'e') toggleExplodeColdPlate();
+      if (k === 'r') toggleBuildingRoof();
+      if (k === 'tab') {
+        e.preventDefault();
+        selectArchitecture(state.arch === 'tpu' ? 'gpu' : 'tpu');
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      state.keys[e.key.toLowerCase()] = false;
+    });
+
+    // ============================================================================
+    // MAIN 60FPS RENDER & ARTICULATED MECHANICAL ANIMATION LOOP
+    // ============================================================================
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    let lastTime = performance.now();
+
+    function renderLoop(now) {
+      const dt = Math.min((now - lastTime) * 0.001, 0.1);
+      lastTime = now;
+      state.time += dt;
+
+      // 1. WASD Free Panning / Walking of Camera Target
+      const panSpeed = Math.max(0.35, state.cam.curDist * 0.75) * dt;
+      const fwdX = -Math.sin(state.cam.curYaw);
+      const fwdZ = -Math.cos(state.cam.curYaw);
+      const rightX = Math.cos(state.cam.curYaw);
+      const rightZ = -Math.sin(state.cam.curYaw);
+
+      if (state.keys['w'] || state.keys['arrowup'])    { state.cam.targetX += fwdX * panSpeed; state.cam.targetZ += fwdZ * panSpeed; }
+      if (state.keys['s'] || state.keys['arrowdown'])  { state.cam.targetX -= fwdX * panSpeed; state.cam.targetZ -= fwdZ * panSpeed; }
+      if (state.keys['d'] || state.keys['arrowright']) { state.cam.targetX += rightX * panSpeed; state.cam.targetZ += rightZ * panSpeed; }
+      if (state.keys['a'] || state.keys['arrowleft'])  { state.cam.targetX -= rightX * panSpeed; state.cam.targetZ -= rightZ * panSpeed; }
+
+      // 2. Smooth Damped Camera Interpolation
+      const lerp = 1.0 - Math.exp(-dt * 8.5);
+      state.cam.curTargetX += (state.cam.targetX - state.cam.curTargetX) * lerp;
+      state.cam.curTargetY += (state.cam.targetY - state.cam.curTargetY) * lerp;
+      state.cam.curTargetZ += (state.cam.targetZ - state.cam.curTargetZ) * lerp;
+      state.cam.curYaw     += (state.cam.yaw     - state.cam.curYaw)     * lerp;
+      state.cam.curPitch   += (state.cam.pitch   - state.cam.curPitch)   * lerp;
+      state.cam.curDist    += (state.cam.dist    - state.cam.curDist)    * lerp;
+
+      state.cam.eyeX = state.cam.curTargetX + Math.sin(state.cam.curYaw) * Math.cos(state.cam.curPitch) * state.cam.curDist;
+      state.cam.eyeY = Math.max(0.18, state.cam.curTargetY + Math.sin(state.cam.curPitch) * state.cam.curDist);
+      state.cam.eyeZ = state.cam.curTargetZ + Math.cos(state.cam.curYaw) * Math.cos(state.cam.curPitch) * state.cam.curDist;
+
+      // 3. Smooth Mechanical Articulation (Building 1 Roof Cutaway, Rack Doors, Compute Trays, Cold Plate!)
+      const mechLerp = 1.0 - Math.exp(-dt * 6.5);
+      const roofLiftTarget = (state.zoomLevel >= 1 || state.roofCutaway) ? 24.0 : 0.0;
+      const tpuDoorTarget  = (state.zoomLevel >= 2 && state.arch === 'tpu') ? -1.95 : 0.0;
+      const gpuDoorTarget  = (state.zoomLevel >= 2 && state.arch === 'gpu') ?  1.95 : 0.0;
+      const tpuSlideTarget = (state.zoomLevel >= 3 && state.arch === 'tpu') ?  0.72 : 0.0;
+      const gpuSlideTarget = (state.zoomLevel >= 3 && state.arch === 'gpu') ?  0.72 : 0.0;
+      const liftTarget     = state.explodeColdPlate ? 0.078 : 0.0;
+
+      state.roofLift      += (roofLiftTarget - state.roofLift)      * mechLerp;
+      state.tpuDoorAngle  += (tpuDoorTarget  - state.tpuDoorAngle)  * mechLerp;
+      state.gpuDoorAngle  += (gpuDoorTarget  - state.gpuDoorAngle)  * mechLerp;
+      state.tpuTraySlide  += (tpuSlideTarget - state.tpuTraySlide)  * mechLerp;
+      state.gpuTraySlide  += (gpuSlideTarget - state.gpuTraySlide)  * mechLerp;
+      state.coldPlateLift += (liftTarget     - state.coldPlateLift) * mechLerp;
+
+      // 4. Compute View-Projection Matrix (Far plane = 480m for full 1.2GW Campus & 500kV State Grid corridor)
+      const aspect = canvas.width / canvas.height;
+      const proj = mat4Perspective(46 * Math.PI / 180, aspect, 0.02, 480.0);
+      const view = mat4LookAt(
+        state.cam.eyeX, state.cam.eyeY, state.cam.eyeZ,
+        state.cam.curTargetX, state.cam.curTargetY, state.cam.curTargetZ
+      );
+      const viewProj = mat4Mul(proj, view);
+      lastViewProj = viewProj;
+
+      // 5. Render WebGL2 Scene
+      gl.enable(gl.DEPTH_TEST);
+      gl.disable(gl.CULL_FACE);
+      gl.clearColor(0.024, 0.032, 0.048, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+      gl.useProgram(pbrProg);
+      const uVP    = gl.getUniformLocation(pbrProg, 'uViewProj');
+      const uModel = gl.getUniformLocation(pbrProg, 'uModel');
+      const uCam   = gl.getUniformLocation(pbrProg, 'uCamPos');
+      const uTime  = gl.getUniformLocation(pbrProg, 'uTime');
+      const uTrace = gl.getUniformLocation(pbrProg, 'uTraceMode');
+
+      gl.uniformMatrix4fv(uVP, false, viewProj);
+      gl.uniform3f(uCam, state.cam.eyeX, state.cam.eyeY, state.cam.eyeZ);
+      gl.uniform1f(uTime, state.time);
+      gl.uniform1i(uTrace, state.traceMode);
+
+      function drawMesh(m, modelMat) {
+        gl.uniformMatrix4fv(uModel, false, modelMat);
+        gl.bindVertexArray(m.vao);
+        gl.drawElements(gl.TRIANGLES, m.count, gl.UNSIGNED_INT, 0);
+      }
+
+      // A. Draw Static 1.2GW Campus, 500kV State Grid, Switchyard, BESS, Cooling Plant & Building 1 Interior
+      drawMesh(meshes.staticWorld, mat4Identity());
+
+      // B. Draw Articulated Building 1 Roof & Solar Canopy (Hides once lifted high above camera during interior inspection)
+      if (state.roofLift < 19.5) {
+        drawMesh(meshes.bldg1Roof, mat4Translate(0, state.roofLift, 0));
+      }
+
+      // C. Draw Articulated Pull-Out Compute Trays (TPU v6e Tray & NVIDIA GB200 Tray)
+      drawMesh(meshes.tpuTray, mat4Translate(TPU_RACK_X, HERO_TRAY_Y, state.tpuTraySlide));
+      drawMesh(meshes.gpuTray, mat4Translate(GPU_RACK_X, HERO_TRAY_Y, state.gpuTraySlide));
+
+      // D. Draw Explodable Skived Micro-Fin Copper Cold-Plate Assemblies over both Hero Chips
+      drawMesh(meshes.coldPlateLid, mat4Translate(TPU_RACK_X, HERO_TRAY_Y + state.coldPlateLift, state.tpuTraySlide));
+      drawMesh(meshes.coldPlateLid, mat4Translate(GPU_RACK_X, HERO_TRAY_Y + state.coldPlateLift, state.gpuTraySlide));
+
+      // E. Draw Articulated Hinged Perforated Front Doors
+      drawMesh(meshes.tpuDoor, mat4TranslateRotateY(TPU_RACK_X - 0.49, 0.0, 0.59, state.tpuDoorAngle));
+      drawMesh(meshes.gpuDoor, mat4TranslateRotateY(GPU_RACK_X + 0.49, 0.0, 0.59, state.gpuDoorAngle));
+
+      // 6. Update 3D Anchored HTML Callout Pins (Only show pins relevant to the current zoom scale!)
+      EXHIBITS.forEach((ex) => {
+        const el = pinEls[ex.id];
+        const visibleAtLevel = ex.levels.includes(state.zoomLevel);
+        if (!visibleAtLevel) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          return;
+        }
+        const pos = ex.getPos();
+        const scr = project3DToScreen(pos[0], pos[1], pos[2], viewProj);
+        if (scr && scr.x > 40 && scr.x < window.innerWidth - 40 && scr.y > 65 && scr.y < window.innerHeight - 65) {
+          el.style.opacity = '1';
+          el.style.pointerEvents = 'auto';
+          el.style.left = `${scr.x}px`;
+          el.style.top = `${scr.y}px`;
+        } else {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+        }
+      });
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    // Initialize Museum View at Level 0 (1.2GW Campus & 500kV State Grid Overview)
+    populatePlacard(EXHIBITS[0], 0);
+    syncRoofBtn();
+    requestAnimationFrame(renderLoop);
+  </script>
+</body>
+</html>
